@@ -14,6 +14,21 @@
 When in doubt, choose the more restrictive, more auditable, and more explicit option.
 Never trade correctness or security for brevity or convenience.
 
+### Simplicity is a security property
+
+Simple code is easier to read, easier to audit, easier to test, and harder to exploit.
+Complexity is where bugs hide — and in security-sensitive code, bugs become vulnerabilities.
+
+- **Prefer the shortest correct solution.** If two implementations are equally correct and safe, choose the shorter one.
+- **Prefer clarity over cleverness.** Code that a reviewer can understand in 30 seconds is better than elegant code that takes 10 minutes to reason about.
+- **Avoid over-engineering.** Do not introduce abstractions, layers, or generalization that the current requirements do not justify. You can always add complexity later; removing it is harder.
+- **One thing per function.** Functions and methods should do one thing and do it clearly. Long functions that mix concerns are harder to audit for security correctness.
+- **Avoid deep nesting.** Prefer early returns and guard clauses over deeply nested conditionals — control flow that is hard to follow is control flow that is easy to get wrong.
+- **Do not rewrite working code to be more sophisticated.** If existing code is simple, correct, and secure, leave it alone. Refactor only when there is a clear, demonstrable reason.
+- **Flag your own complexity.** If you find yourself writing something non-trivial, add a concise comment explaining *why* — not what the code does, but why it must be done this way.
+
+> A security auditor's time is finite. Every unnecessary line of code is a line they have to read.
+
 ---
 
 ## 1. Proactive Security Posture
@@ -26,7 +41,7 @@ Never trade correctness or security for brevity or convenience.
 
 ### 1.2 Format for out-of-scope warnings
 
-```text
+```markdown
 ⚠ SECURITY WARNING (out of scope — not blocking this task)
 Location: <file>:<line or function>
 Issue: <concise description>
@@ -265,6 +280,7 @@ Always pause and ask the developer before proceeding if you are about to:
 | Infrastructure security | CM-6, CM-7, AC-6, SC-7 |
 | Supply chain / dependencies | SA-12, SA-15, RA-5, SI-2 |
 | Logging & audit | AU-2, AU-3, AU-9, AU-12 |
+| Simplicity & auditability | SA-15, CM-6 (configuration/code clarity as a control) |
 
 ---
 
