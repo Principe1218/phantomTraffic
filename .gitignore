@@ -34,3 +34,6 @@ docs/superpowers/
 # Editor/IDE
 .idea/
 .vscode/
+
+# Local SonarQube files
+.scannerwork/
