@@ -1,0 +1,59 @@
+# Dependabot version updates.
+# https://docs.github.com/code-security/dependabot/dependabot-version-updates/configuration-options-for-the-dependabot.yml-file
+#
+# NOTE: the gomod and npm manifests do not exist yet (project not scaffolded).
+# Those ecosystems will no-op until go.mod and frontend/package.json exist.
+# github-actions activates once workflows are added under .github/workflows.
+
+version: 2
+updates:
+  # ---- Go backend ----
+  - package-ecosystem: "gomod"
+    directory: "/" # go.mod at repo root
+    schedule:
+      interval: "weekly"
+    open-pull-requests-limit: 10
+    labels:
+      - "dependencies"
+      - "go"
+    commit-message:
+      prefix: "go"
+    groups:
+      go-minor-patch:
+        update-types:
+          - "minor"
+          - "patch"
+
+  # ---- React + TypeScript frontend (Wails) ----
+  - package-ecosystem: "npm"
+    directory: "/frontend" # frontend/package.json
+    schedule:
+      interval: "weekly"
+    open-pull-requests-limit: 10
+    labels:
+      - "dependencies"
+      - "frontend"
+    commit-message:
+      prefix: "npm"
+    groups:
+      npm-minor-patch:
+        update-types:
+          - "minor"
+          - "patch"
+
+  # ---- GitHub Actions (CI) ----
+  - package-ecosystem: "github-actions"
+    directory: "/" # workflows under .github/workflows
+    schedule:
+      interval: "weekly"
+    open-pull-requests-limit: 5
+    labels:
+      - "dependencies"
+      - "ci"
+    commit-message:
+      prefix: "ci"
+    groups:
+      actions-all:
+        update-types:
+          - "minor"
+          - "patch"

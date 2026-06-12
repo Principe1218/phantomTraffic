@@ -29,6 +29,7 @@ go.work.sum
 
 # Vibe Coding
 docs/superpowers/
+.claude/
 
 # Editor/IDE
 .idea/

@@ -1,0 +1,69 @@
+name: Bug report
+description: Report a problem with PhantomTraffic
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for filing a bug. Please fill out the fields below.
+
+        ⚠️ **Do not paste real internal hostnames, IP addresses, credentials, or other
+        sensitive data.** Sanitize any scenario config or logs first.
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened?
+      description: A clear description of the bug, including what you expected to happen instead.
+    validations:
+      required: true
+  - type: textarea
+    id: repro
+    attributes:
+      label: Steps to reproduce
+      description: How can we reproduce this?
+      placeholder: |
+        1. ...
+        2. ...
+        3. ...
+    validations:
+      required: true
+  - type: textarea
+    id: config
+    attributes:
+      label: Scenario config (sanitized)
+      description: The relevant YAML or settings, with hostnames/IPs/credentials redacted.
+      render: yaml
+    validations:
+      required: false
+  - type: dropdown
+    id: interface
+    attributes:
+      label: Interface
+      options:
+        - CLI
+        - Desktop UI (Wails)
+        - Both
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: Version / commit
+      description: Output of `phantom --version`, or the commit SHA you built from.
+    validations:
+      required: true
+  - type: input
+    id: os
+    attributes:
+      label: OS / platform
+      placeholder: "e.g., macOS 14.5 (arm64), Ubuntu 24.04, Windows 11"
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Relevant logs
+      description: Paste any relevant log output (sanitized).
+      render: shell
+    validations:
+      required: false
