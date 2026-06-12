@@ -27,6 +27,9 @@ go.work.sum
 # env file
 .env
 
+# Vibe Coding
+docs/superpowers/
+
 # Editor/IDE
-# .idea/
-# .vscode/
+.idea/
+.vscode/
