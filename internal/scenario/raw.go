@@ -9,7 +9,7 @@ type RawCaps struct {
 	MaxConcurrentSessions        int     `yaml:"max_concurrent_sessions"`
 	TotalRequestBudget           int64   `yaml:"total_request_budget"`
 	StreamingByteRateKbps        int     `yaml:"streaming_byte_rate_kbps"`
-	ConcurrentStreams             int     `yaml:"concurrent_streams"`
+	ConcurrentStreams            int     `yaml:"concurrent_streams"`
 	PerSessionMaxDurationSeconds int     `yaml:"per_session_max_duration_seconds"`
 	PerSessionMaxActions         int     `yaml:"per_session_max_actions"`
 }

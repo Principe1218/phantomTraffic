@@ -17,7 +17,7 @@ type CapSpec struct {
 	MaxConcurrentSessions        int
 	TotalRequestBudget           int64
 	StreamingByteRateKbps        int
-	ConcurrentStreams             int
+	ConcurrentStreams            int
 	PerSessionMaxDurationSeconds int
 	PerSessionMaxActions         int
 }

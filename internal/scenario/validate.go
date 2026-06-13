@@ -188,7 +188,7 @@ func toCapSpec(rc RawCaps) safety.CapSpec {
 		MaxConcurrentSessions:        rc.MaxConcurrentSessions,
 		TotalRequestBudget:           rc.TotalRequestBudget,
 		StreamingByteRateKbps:        rc.StreamingByteRateKbps,
-		ConcurrentStreams:             rc.ConcurrentStreams,
+		ConcurrentStreams:            rc.ConcurrentStreams,
 		PerSessionMaxDurationSeconds: rc.PerSessionMaxDurationSeconds,
 		PerSessionMaxActions:         rc.PerSessionMaxActions,
 	}
