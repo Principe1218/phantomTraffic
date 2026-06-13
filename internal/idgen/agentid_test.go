@@ -23,7 +23,7 @@ func TestAgentID_CreatesThenPersists(t *testing.T) {
 	}
 
 	// File must exist and contain exactly the id (trailing newline tolerated).
-	raw, err := os.ReadFile(path)
+	raw, err := os.ReadFile(path) // #nosec G304 -- test reads a file under t.TempDir(), not user input
 	if err != nil {
 		t.Fatalf("read persisted file: %v", err)
 	}

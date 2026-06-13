@@ -39,6 +39,8 @@ func AgentID(path string) (string, error) {
 // means "no file yet" (mint a new one); a present-but-invalid file is a hard error
 // so a corrupt id is never silently trusted.
 func loadAgentID(path string) (id string, ok bool, err error) {
+	// #nosec G304 -- path is the controlled AgentID persistence location passed by
+	// the caller (an API parameter), never user-supplied request data.
 	raw, readErr := os.ReadFile(path)
 	if readErr != nil {
 		if os.IsNotExist(readErr) {
