@@ -65,20 +65,24 @@ func TestDispatch_Routing(t *testing.T) {
 			if got != tc.wantCode {
 				t.Fatalf("dispatch(%v) = %d, want %d", tc.args, got, tc.wantCode)
 			}
-			if tc.wantOnOut == "" {
-				if out.Len() != 0 {
-					t.Fatalf("stdout = %q, want empty", out.String())
-				}
-			} else if !strings.Contains(out.String(), tc.wantOnOut) {
-				t.Fatalf("stdout = %q, want substring %q", out.String(), tc.wantOnOut)
-			}
-			if tc.wantOnErr == "" {
-				if errBuf.Len() != 0 {
-					t.Fatalf("stderr = %q, want empty", errBuf.String())
-				}
-			} else if !strings.Contains(errBuf.String(), tc.wantOnErr) {
-				t.Fatalf("stderr = %q, want substring %q", errBuf.String(), tc.wantOnErr)
-			}
+			assertStream(t, "stdout", out.String(), tc.wantOnOut)
+			assertStream(t, "stderr", errBuf.String(), tc.wantOnErr)
 		})
+	}
+}
+
+// assertStream checks a captured output stream against an expectation.
+// An empty want means the stream must be empty; otherwise want must appear
+// as a substring. Extracted to keep TestDispatch_Routing's loop body flat.
+func assertStream(t *testing.T, name, got, want string) {
+	t.Helper()
+	if want == "" {
+		if got != "" {
+			t.Fatalf("%s = %q, want empty", name, got)
+		}
+		return
+	}
+	if !strings.Contains(got, want) {
+		t.Fatalf("%s = %q, want substring %q", name, got, want)
 	}
 }
