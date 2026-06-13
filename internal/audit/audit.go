@@ -3,7 +3,21 @@
 // insecure-transport opt-ins (design §2, §5.5, §7; AGENTS.md §9 AU-2/AU-3).
 //
 // Each persisted Record carries the prior record's SHA-256 digest, forming a
-// hash chain so post-hoc tampering with any record is detectable (design §5.5).
+// hash chain (design §5.5). The chain makes the following tampering detectable:
+// mutation of any field of an interior record, reordering of records, and — while
+// the writing process is still live — truncation or forged extension of the tail
+// (Verify cross-checks the on-disk tail against the in-memory chain state).
+//
+// Scope of the guarantee (be precise): hash-chaining ALONE cannot detect
+// cross-restart tail truncation or a forged tail-extension. After a restart there
+// is no prior in-memory tail to compare against, so a chain that was truncated (or
+// re-tipped with a record that correctly chains off an earlier real record) while
+// the process was down is internally self-consistent and indistinguishable from a
+// legitimately shorter/extended log. Detecting that requires an EXTERNAL anchor
+// (e.g. periodically publishing the tail hash + sequence to a separate trust
+// boundary) — a deployment responsibility, consistent with this client-only design
+// and AGENTS.md §9 (tamper-evident, centralized sink).
+//
 // Events carry actor / action / resource and a timestamp that the Sink stamps
 // from the injected clock.Clock — callers never supply the time. Events must
 // never contain secrets or PII: ValidateEvent rejects known-sensitive Detail keys
@@ -62,9 +76,9 @@ type Event struct {
 // field INCLUDING PrevHash, so altering any field (or reordering records) breaks
 // the chain (design §5.5).
 type Record struct {
-	Seq      uint64            `json:"seq"`       // 0-based monotonic position in the chain
-	Time     time.Time         `json:"time"`      // stamped by the injected clock.Clock
-	AgentID  string            `json:"agent_id"`  // per-agent identity (design §7 / line 603)
+	Seq      uint64            `json:"seq"`      // 0-based monotonic position in the chain
+	Time     time.Time         `json:"time"`     // stamped by the injected clock.Clock
+	AgentID  string            `json:"agent_id"` // per-agent identity (design §7 / line 603)
 	Actor    string            `json:"actor"`
 	Action   Action            `json:"action"`
 	Resource string            `json:"resource"`

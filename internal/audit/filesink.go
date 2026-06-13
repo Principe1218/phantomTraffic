@@ -17,14 +17,26 @@ type Sink interface {
 	// chain, and durably writes it. It returns ErrSecretInEvent / ErrEmptyField
 	// without writing anything when validation fails.
 	Append(e Event) error
-	// Verify re-reads the entire log and confirms every record's hash and the
-	// PrevHash linkage. Returns ErrChainBroken on the first inconsistency.
+	// Verify re-reads the entire log, confirms every record's hash and PrevHash
+	// linkage, and cross-checks the on-disk tail (sequence + hash) against this
+	// sink's in-memory chain state. It detects interior mutation, reordering, and
+	// in-process tail truncation / forged tail-extension, returning ErrChainBroken
+	// on the first inconsistency. It does NOT, by itself, detect cross-restart tail
+	// truncation or forged tail-extension — after a reopen there is no prior
+	// in-memory tail to compare against; that requires an external anchor (see the
+	// package doc and AGENTS.md §9).
 	Verify() error
 	// Close releases the underlying file. Idempotent.
 	Close() error
 }
 
 // FileSink is a file-backed, append-only, hash-chained Sink (design §5.5).
+//
+// Tamper-evidence scope: while a FileSink is live, Verify detects interior record
+// mutation, reordering, and tail truncation / forged tail-extension by cross-checking
+// the on-disk tail against the in-memory nextSeq/tailHash. It does NOT, on its own,
+// detect cross-restart tail truncation or forged tail-extension — that needs an
+// external anchor (see the package doc and AGENTS.md §9).
 type FileSink struct {
 	mu       sync.Mutex
 	f        *os.File
@@ -41,6 +53,13 @@ var _ Sink = (*FileSink)(nil)
 // 0600 permissions. If the file already contains records, it replays and verifies
 // the chain, recovering the next sequence number and the tail hash so appends
 // continue the same chain. A corrupt existing chain fails fast with ErrChainBroken.
+//
+// Known non-enforcement: the sink does NOT enforce single-agent ownership across
+// reopen. An existing chain whose tail record carries a different AgentID than the
+// agentID passed here is accepted and continued; subsequent records are stamped
+// with the new agentID. This is deliberate — enforcing it would break legitimate
+// reopen by a differently-identified process — but it means a mixed-AgentID chain
+// is not, by itself, evidence of tampering.
 func NewFileSink(path string, clk clock.Clock, agentID string) (*FileSink, error) {
 	if clk == nil {
 		return nil, fmt.Errorf("audit: NewFileSink requires a non-nil clock")
@@ -146,15 +165,29 @@ func (s *FileSink) Append(e Event) error {
 	return nil
 }
 
-// Verify implements Sink by re-reading the whole file and walking the chain.
+// Verify implements Sink by re-reading the whole file, walking the chain, and
+// cross-checking the on-disk tail against this sink's in-memory chain state. The
+// internal walk (replay) catches interior mutation and reordering; the cross-check
+// against nextSeq/tailHash additionally catches in-process tail truncation (a
+// deleted last record) and forged tail-extension (a record appended out-of-band
+// that chains off the real tail). See the package doc for the cross-restart limit.
 func (s *FileSink) Verify() error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	if err := s.f.Sync(); err != nil {
 		return fmt.Errorf("audit: fsync before verify: %w", err)
 	}
-	_, _, err := replay(s.f.Name())
-	return err
+	onDiskSeq, onDiskTail, err := replay(s.f.Name())
+	if err != nil {
+		return err
+	}
+	// Cross-check: the on-disk chain must end exactly where this sink believes it
+	// does. A divergence means the tail was truncated or extended out-of-band.
+	if onDiskSeq != s.nextSeq || onDiskTail != s.tailHash {
+		return fmt.Errorf("%w: on-disk tail at seq %d diverges from in-memory tail at seq %d",
+			ErrChainBroken, onDiskSeq, s.nextSeq)
+	}
+	return nil
 }
 
 // Close implements Sink. It is idempotent.

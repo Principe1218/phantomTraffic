@@ -20,10 +20,10 @@ import (
 // the rest satisfy the interface. Time advances only when Set/Advance is called.
 type fakeClock struct{ now time.Time }
 
-func newFakeClock(t time.Time) *fakeClock           { return &fakeClock{now: t} }
-func (c *fakeClock) Now() time.Time                 { return c.now }
+func newFakeClock(t time.Time) *fakeClock            { return &fakeClock{now: t} }
+func (c *fakeClock) Now() time.Time                  { return c.now }
 func (c *fakeClock) Since(t time.Time) time.Duration { return c.now.Sub(t) }
-func (c *fakeClock) Advance(d time.Duration)        { c.now = c.now.Add(d) }
+func (c *fakeClock) Advance(d time.Duration)         { c.now = c.now.Add(d) }
 func (c *fakeClock) Sleep(ctx context.Context, d time.Duration) error {
 	c.now = c.now.Add(d)
 	return nil
@@ -348,6 +348,120 @@ func TestFileSinkDetectsMutatedMiddleRecord(t *testing.T) {
 	_, err = audit.NewFileSink(path, clk, "agent-A")
 	if !errors.Is(err, audit.ErrChainBroken) {
 		t.Fatalf("NewFileSink on tampered chain err = %v, want ErrChainBroken", err)
+	}
+}
+
+// appendN appends n patched-scenario records to a live sink, advancing the clock
+// each time. It is a helper for the tail-tampering tests below.
+func appendN(t *testing.T, sink audit.Sink, clk *fakeClock, n int) {
+	t.Helper()
+	for i := 0; i < n; i++ {
+		clk.Advance(time.Minute)
+		if err := sink.Append(audit.Event{
+			Actor:    "cli",
+			Action:   audit.ActionScenarioPatched,
+			Resource: "run-1",
+			Detail:   map[string]string{"step": fmt.Sprintf("%d", i)},
+		}); err != nil {
+			t.Fatalf("append %d: %v", i, err)
+		}
+	}
+}
+
+// C1: deleting the last on-disk record under a LIVE sink must be caught by Verify,
+// because the on-disk tail no longer matches the in-memory tail. replay() alone
+// would not catch this — the truncated chain is internally self-consistent.
+func TestFileSinkVerifyDetectsLiveTailTruncation(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "audit.log")
+	clk := newFakeClock(time.Date(2026, 6, 11, 9, 0, 0, 0, time.UTC))
+	sink, err := audit.NewFileSink(path, clk, "agent-A")
+	if err != nil {
+		t.Fatalf("NewFileSink: %v", err)
+	}
+	defer sink.Close()
+
+	const n = 5
+	appendN(t, sink, clk, n)
+	if err := sink.Verify(); err != nil {
+		t.Fatalf("Verify clean chain: %v", err)
+	}
+
+	// Delete the last line on disk, bypassing the sink.
+	recs := readRecords(t, path)
+	if len(recs) != n {
+		t.Fatalf("expected %d records, got %d", n, len(recs))
+	}
+	var buf []byte
+	for _, r := range recs[:n-1] { // drop the tail record
+		b, err := json.Marshal(r)
+		if err != nil {
+			t.Fatalf("marshal: %v", err)
+		}
+		buf = append(buf, b...)
+		buf = append(buf, '\n')
+	}
+	if err := os.WriteFile(path, buf, 0o600); err != nil {
+		t.Fatalf("rewrite truncated file: %v", err)
+	}
+
+	// The live sink still believes the chain has n records; Verify must catch it.
+	if err := sink.Verify(); !errors.Is(err, audit.ErrChainBroken) {
+		t.Fatalf("Verify after live tail truncation err = %v, want ErrChainBroken", err)
+	}
+}
+
+// C1: appending a forged record that correctly chains off the real tail (written
+// directly to the file, bypassing the sink) must be caught by Verify, because the
+// on-disk tail advances past the in-memory tail. The forged record is internally
+// valid, so replay() alone would accept it.
+func TestFileSinkVerifyDetectsForgedTailAppend(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "audit.log")
+	clk := newFakeClock(time.Date(2026, 6, 11, 9, 0, 0, 0, time.UTC))
+	sink, err := audit.NewFileSink(path, clk, "agent-A")
+	if err != nil {
+		t.Fatalf("NewFileSink: %v", err)
+	}
+	defer sink.Close()
+
+	const n = 3
+	appendN(t, sink, clk, n)
+	if err := sink.Verify(); err != nil {
+		t.Fatalf("Verify clean chain: %v", err)
+	}
+
+	// Forge a record that chains off the genuine tail and recompute its hash, so it
+	// passes replay()'s internal checks. Append it out-of-band.
+	recs := readRecords(t, path)
+	tail := recs[len(recs)-1]
+	forged := audit.Record{
+		Seq:      tail.Seq + 1,
+		Time:     time.Date(2026, 6, 11, 10, 0, 0, 0, time.UTC),
+		AgentID:  "agent-A",
+		Actor:    "cli",
+		Action:   audit.ActionScenarioStopped,
+		Resource: "run-1",
+		PrevHash: tail.Hash,
+	}
+	forged.Hash = audit.HashRecordForTest(forged)
+	var buf []byte
+	for _, r := range append(recs, forged) {
+		b, err := json.Marshal(r)
+		if err != nil {
+			t.Fatalf("marshal: %v", err)
+		}
+		buf = append(buf, b...)
+		buf = append(buf, '\n')
+	}
+	if err := os.WriteFile(path, buf, 0o600); err != nil {
+		t.Fatalf("rewrite file with forged tail: %v", err)
+	}
+
+	// The live sink's in-memory tail is still at seq n; Verify must catch the
+	// out-of-band extension even though the forged record is internally valid.
+	if err := sink.Verify(); !errors.Is(err, audit.ErrChainBroken) {
+		t.Fatalf("Verify after forged tail append err = %v, want ErrChainBroken", err)
 	}
 }
 
