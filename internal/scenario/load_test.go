@@ -16,87 +16,43 @@ func TestLoadHappyPath(t *testing.T) {
 		t.Fatalf("Load(valid.yaml) returned error: %v", err)
 	}
 
-	if raw.Name != "smoke" {
-		t.Errorf("Name = %q, want %q", raw.Name, "smoke")
-	}
-	if raw.Description != "minimal valid scenario for decode tests" {
-		t.Errorf("Description = %q, want the fixture description", raw.Description)
-	}
-	if got, want := len(raw.AllowedDomains), 2; got != want {
-		t.Fatalf("len(AllowedDomains) = %d, want %d", got, want)
-	}
-	if raw.AllowedDomains[0] != "example.com" || raw.AllowedDomains[1] != "api.example.com" {
-		t.Errorf("AllowedDomains = %v, want [example.com api.example.com]", raw.AllowedDomains)
-	}
+	expectEqual(t, "Name", raw.Name, "smoke")
+	expectEqual(t, "Description", raw.Description, "minimal valid scenario for decode tests")
+
+	// Length checks gate the indexing below, so they must halt the test (assert*).
+	assertEqual(t, "len(AllowedDomains)", len(raw.AllowedDomains), 2)
+	expectEqual(t, "AllowedDomains[0]", raw.AllowedDomains[0], "example.com")
+	expectEqual(t, "AllowedDomains[1]", raw.AllowedDomains[1], "api.example.com")
 
 	// Caps decode into the typed fields with the exact yaml tags.
-	if raw.Caps.PerTargetRPS != 5 {
-		t.Errorf("Caps.PerTargetRPS = %v, want 5", raw.Caps.PerTargetRPS)
-	}
-	if raw.Caps.GlobalRPS != 25 {
-		t.Errorf("Caps.GlobalRPS = %v, want 25", raw.Caps.GlobalRPS)
-	}
-	if raw.Caps.MaxConcurrentSessions != 10 {
-		t.Errorf("Caps.MaxConcurrentSessions = %d, want 10", raw.Caps.MaxConcurrentSessions)
-	}
-	if raw.Caps.TotalRequestBudget != 100000 {
-		t.Errorf("Caps.TotalRequestBudget = %d, want 100000", raw.Caps.TotalRequestBudget)
-	}
-	if raw.Caps.StreamingByteRateKbps != 6000 {
-		t.Errorf("Caps.StreamingByteRateKbps = %d, want 6000", raw.Caps.StreamingByteRateKbps)
-	}
-	if raw.Caps.ConcurrentStreams != 2 {
-		t.Errorf("Caps.ConcurrentStreams = %d, want 2", raw.Caps.ConcurrentStreams)
-	}
-	if raw.Caps.PerSessionMaxDurationSeconds != 600 {
-		t.Errorf("Caps.PerSessionMaxDurationSeconds = %d, want 600", raw.Caps.PerSessionMaxDurationSeconds)
-	}
-	if raw.Caps.PerSessionMaxActions != 5000 {
-		t.Errorf("Caps.PerSessionMaxActions = %d, want 5000", raw.Caps.PerSessionMaxActions)
-	}
+	expectEqual(t, "Caps.PerTargetRPS", raw.Caps.PerTargetRPS, 5)
+	expectEqual(t, "Caps.GlobalRPS", raw.Caps.GlobalRPS, 25)
+	expectEqual(t, "Caps.MaxConcurrentSessions", raw.Caps.MaxConcurrentSessions, 10)
+	expectEqual(t, "Caps.TotalRequestBudget", raw.Caps.TotalRequestBudget, 100000)
+	expectEqual(t, "Caps.StreamingByteRateKbps", raw.Caps.StreamingByteRateKbps, 6000)
+	expectEqual(t, "Caps.ConcurrentStreams", raw.Caps.ConcurrentStreams, 2)
+	expectEqual(t, "Caps.PerSessionMaxDurationSeconds", raw.Caps.PerSessionMaxDurationSeconds, 600)
+	expectEqual(t, "Caps.PerSessionMaxActions", raw.Caps.PerSessionMaxActions, 5000)
 
 	// Execution.
-	if raw.Execution.Mode != "sequential" {
-		t.Errorf("Execution.Mode = %q, want sequential", raw.Execution.Mode)
-	}
-	if !raw.Execution.StopOnError {
-		t.Errorf("Execution.StopOnError = false, want true")
-	}
+	expectEqual(t, "Execution.Mode", raw.Execution.Mode, "sequential")
+	expectEqual(t, "Execution.StopOnError", raw.Execution.StopOnError, true)
 
 	// Scenario blocks.
-	if got, want := len(raw.Scenarios), 2; got != want {
-		t.Fatalf("len(Scenarios) = %d, want %d", got, want)
-	}
+	assertEqual(t, "len(Scenarios)", len(raw.Scenarios), 2)
 	first := raw.Scenarios[0]
-	if first.ID != "web-browse" {
-		t.Errorf("Scenarios[0].ID = %q, want web-browse", first.ID)
-	}
-	if first.Protocol != "http" {
-		t.Errorf("Scenarios[0].Protocol = %q, want http", first.Protocol)
-	}
-	if got, want := len(first.Targets), 2; got != want {
-		t.Fatalf("len(Scenarios[0].Targets) = %d, want %d", got, want)
-	}
-	if first.Targets[0] != "example.com:443" {
-		t.Errorf("Scenarios[0].Targets[0] = %q, want example.com:443", first.Targets[0])
-	}
-	if first.TargetRotation != "random" {
-		t.Errorf("Scenarios[0].TargetRotation = %q, want random", first.TargetRotation)
-	}
-	if first.TargetRotationIntervalSeconds != 30 {
-		t.Errorf("Scenarios[0].TargetRotationIntervalSeconds = %d, want 30", first.TargetRotationIntervalSeconds)
-	}
-	if first.AllowInsecure {
-		t.Errorf("Scenarios[0].AllowInsecure = true, want false")
-	}
+	expectEqual(t, "Scenarios[0].ID", first.ID, "web-browse")
+	expectEqual(t, "Scenarios[0].Protocol", first.Protocol, "http")
+	assertEqual(t, "len(Scenarios[0].Targets)", len(first.Targets), 2)
+	expectEqual(t, "Scenarios[0].Targets[0]", first.Targets[0], "example.com:443")
+	expectEqual(t, "Scenarios[0].TargetRotation", first.TargetRotation, "random")
+	expectEqual(t, "Scenarios[0].TargetRotationIntervalSeconds", first.TargetRotationIntervalSeconds, 30)
+	expectEqual(t, "Scenarios[0].AllowInsecure", first.AllowInsecure, false)
 
 	second := raw.Scenarios[1]
-	if second.ID != "name-lookups" || second.Protocol != "dns" {
-		t.Errorf("Scenarios[1] = {ID:%q Protocol:%q}, want {name-lookups dns}", second.ID, second.Protocol)
-	}
-	if second.TargetRotationIntervalSeconds != 0 {
-		t.Errorf("Scenarios[1].TargetRotationIntervalSeconds = %d, want 0", second.TargetRotationIntervalSeconds)
-	}
+	expectEqual(t, "Scenarios[1].ID", second.ID, "name-lookups")
+	expectEqual(t, "Scenarios[1].Protocol", second.Protocol, "dns")
+	expectEqual(t, "Scenarios[1].TargetRotationIntervalSeconds", second.TargetRotationIntervalSeconds, 0)
 }
 
 func TestLoadRejectsUnknownKey(t *testing.T) {

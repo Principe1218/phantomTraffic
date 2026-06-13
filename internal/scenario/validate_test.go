@@ -1,6 +1,7 @@
 package scenario
 
 import (
+	"fmt"
 	"strings"
 	"testing"
 	"time"
@@ -25,69 +26,38 @@ func TestValidateHappyPath(t *testing.T) {
 		t.Fatalf("Validate returned error on a valid fixture: %v", err)
 	}
 
-	if sc.Name != "company baseline" {
-		t.Fatalf("Scenario.Name = %q, want %q", sc.Name, "company baseline")
-	}
-	if sc.Description != "a fully valid scenario covering all four protocols" {
-		t.Fatalf("Scenario.Description = %q, unexpected", sc.Description)
-	}
-	if sc.AgentCount != 1 {
-		t.Fatalf("Scenario.AgentCount = %d, want 1", sc.AgentCount)
-	}
-	if len(sc.Blocks) != 4 {
-		t.Fatalf("len(Scenario.Blocks) = %d, want 4", len(sc.Blocks))
-	}
+	assertEqual(t, "Scenario.Name", sc.Name, "company baseline")
+	assertEqual(t, "Scenario.Description", sc.Description, "a fully valid scenario covering all four protocols")
+	assertEqual(t, "Scenario.AgentCount", sc.AgentCount, 1)
+	assertEqual(t, "len(Scenario.Blocks)", len(sc.Blocks), 4)
 
 	// Parsed protocols, in source order.
 	wantProto := []protocols.ProtocolID{
 		protocols.ProtoHTTP, protocols.ProtoDNS, protocols.ProtoSSH, protocols.ProtoStream,
 	}
 	for i, want := range wantProto {
-		if sc.Blocks[i].Protocol != want {
-			t.Fatalf("Blocks[%d].Protocol = %q, want %q", i, sc.Blocks[i].Protocol, want)
-		}
+		assertEqual(t, fmt.Sprintf("Blocks[%d].Protocol", i), sc.Blocks[i].Protocol, want)
 	}
 
 	// Block 0: rotation sequential, interval 300s, two typed targets.
 	b0 := sc.Blocks[0]
-	if b0.ID != "web" {
-		t.Fatalf("Blocks[0].ID = %q, want %q", b0.ID, "web")
-	}
-	if b0.Rotation != RotationSequential {
-		t.Fatalf("Blocks[0].Rotation = %v, want RotationSequential", b0.Rotation)
-	}
-	if b0.RotationInterval != 300*time.Second {
-		t.Fatalf("Blocks[0].RotationInterval = %v, want 300s", b0.RotationInterval)
-	}
-	if len(b0.Targets) != 2 {
-		t.Fatalf("len(Blocks[0].Targets) = %d, want 2", len(b0.Targets))
-	}
-	if b0.Targets[0].Addr != "web.company.com" || b0.Targets[0].Proto != protocols.ProtoHTTP {
-		t.Fatalf("Blocks[0].Targets[0] = %+v, want addr web.company.com proto http", b0.Targets[0])
-	}
-	if b0.Targets[1].Addr != "api.company.com:8443" {
-		t.Fatalf("Blocks[0].Targets[1].Addr = %q, want api.company.com:8443", b0.Targets[1].Addr)
-	}
-	if !b0.Targets[0].Cred.IsZero() {
-		t.Fatalf("Blocks[0].Targets[0].Cred must be the zero CredentialRef")
-	}
+	assertEqual(t, "Blocks[0].ID", b0.ID, "web")
+	assertEqual(t, "Blocks[0].Rotation", b0.Rotation, RotationSequential)
+	assertEqual(t, "Blocks[0].RotationInterval", b0.RotationInterval, 300*time.Second)
+	assertEqual(t, "len(Blocks[0].Targets)", len(b0.Targets), 2)
+	assertEqual(t, "Blocks[0].Targets[0].Addr", b0.Targets[0].Addr, "web.company.com")
+	assertEqual(t, "Blocks[0].Targets[0].Proto", b0.Targets[0].Proto, protocols.ProtoHTTP)
+	assertEqual(t, "Blocks[0].Targets[1].Addr", b0.Targets[1].Addr, "api.company.com:8443")
+	assertEqual(t, "Blocks[0].Targets[0].Cred.IsZero()", b0.Targets[0].Cred.IsZero(), true)
 
 	// Block 1: rotation random, interval 0 (engine default), one target.
 	b1 := sc.Blocks[1]
-	if b1.Rotation != RotationRandom {
-		t.Fatalf("Blocks[1].Rotation = %v, want RotationRandom", b1.Rotation)
-	}
-	if b1.RotationInterval != 0 {
-		t.Fatalf("Blocks[1].RotationInterval = %v, want 0", b1.RotationInterval)
-	}
+	assertEqual(t, "Blocks[1].Rotation", b1.Rotation, RotationRandom)
+	assertEqual(t, "Blocks[1].RotationInterval", b1.RotationInterval, 0)
 
 	// Execution: sequential, stop-on-error true.
-	if sc.Execution.Mode != ExecSequential {
-		t.Fatalf("Execution.Mode = %v, want ExecSequential", sc.Execution.Mode)
-	}
-	if !sc.Execution.StopOnError {
-		t.Fatalf("Execution.StopOnError = false, want true")
-	}
+	assertEqual(t, "Execution.Mode", sc.Execution.Mode, ExecSequential)
+	assertEqual(t, "Execution.StopOnError", sc.Execution.StopOnError, true)
 
 	// Frozen allowlist: every listed host + allowed_domains is permitted; an
 	// unlisted host is refused (default deny).
@@ -95,32 +65,18 @@ func TestValidateHappyPath(t *testing.T) {
 		"web.company.com", "api.company.com", "ns1.company.com",
 		"bastion.company.com", "media.company.com", "cdn.company.com",
 	} {
-		if !sc.Targets.Permits(host) {
-			t.Fatalf("Targets.Permits(%q) = false, want true", host)
-		}
+		assertEqual(t, fmt.Sprintf("Targets.Permits(%q)", host), sc.Targets.Permits(host), true)
 	}
-	if sc.Targets.Permits("evil.example.com") {
-		t.Fatalf("Targets.Permits(%q) = true, want false (off-allowlist)", "evil.example.com")
-	}
+	assertEqual(t, `Targets.Permits("evil.example.com")`, sc.Targets.Permits("evil.example.com"), false)
 
 	// Effective caps populated (declared values, all under ceiling at agentCount=1).
-	if sc.Caps.PerTargetRPS != 5 {
-		t.Fatalf("Caps.PerTargetRPS = %v, want 5", sc.Caps.PerTargetRPS)
-	}
-	if sc.Caps.GlobalRPS != 25 {
-		t.Fatalf("Caps.GlobalRPS = %v, want 25", sc.Caps.GlobalRPS)
-	}
-	if sc.Caps.MaxConcurrentSessions != 10 {
-		t.Fatalf("Caps.MaxConcurrentSessions = %d, want 10", sc.Caps.MaxConcurrentSessions)
-	}
-	if sc.Caps.PerSessionMaxActions != 5000 {
-		t.Fatalf("Caps.PerSessionMaxActions = %d, want 5000", sc.Caps.PerSessionMaxActions)
-	}
+	assertEqual(t, "Caps.PerTargetRPS", sc.Caps.PerTargetRPS, 5)
+	assertEqual(t, "Caps.GlobalRPS", sc.Caps.GlobalRPS, 25)
+	assertEqual(t, "Caps.MaxConcurrentSessions", sc.Caps.MaxConcurrentSessions, 10)
+	assertEqual(t, "Caps.PerSessionMaxActions", sc.Caps.PerSessionMaxActions, 5000)
 
 	// Ceiling stored is the (divided-by-1) default ceiling.
-	if sc.Ceiling.PerTargetRPS != 10 {
-		t.Fatalf("Ceiling.PerTargetRPS = %v, want 10 (default, agentCount=1)", sc.Ceiling.PerTargetRPS)
-	}
+	assertEqual(t, "Ceiling.PerTargetRPS", sc.Ceiling.PerTargetRPS, 10)
 }
 
 func TestValidateOmittedCapsInheritCeiling(t *testing.T) {
@@ -155,43 +111,21 @@ func TestValidateOmittedCapsInheritCeiling(t *testing.T) {
 func TestValidateAggregatesStructuralErrors(t *testing.T) {
 	raw := loadFixture(t, "invalid_structural.yaml")
 	_, err := Validate(raw, Options{AgentCount: 1})
-	if err == nil {
-		t.Fatalf("Validate returned nil error on a structurally invalid fixture")
-	}
-	ve, ok := err.(ValidationErrors)
-	if !ok {
-		t.Fatalf("Validate error is %T, want ValidationErrors", err)
-	}
+	ve := requireValidationErrors(t, err)
 
-	gotFields := make(map[string]string, len(ve))
-	for _, fe := range ve {
-		gotFields[fe.Field] = fe.Msg
-	}
-
-	wantFields := []string{
+	for _, field := range []string{
 		"name",                  // empty name
 		"scenarios[1].id",       // duplicate "dup"
 		"scenarios[1].protocol", // typo "htttp"
 		"scenarios[2].targets",  // empty targets list
-	}
-	for _, f := range wantFields {
-		if _, present := gotFields[f]; !present {
-			t.Fatalf("missing aggregated FieldError for %q; got fields: %v", f, keysOf(gotFields))
-		}
+	} {
+		assertFieldError(t, ve, field, "")
 	}
 
 	// Aggregation, not first-failure: all four problems reported together.
 	if len(ve) < 4 {
-		t.Fatalf("expected >= 4 aggregated field errors, got %d: %v", len(ve), keysOf(gotFields))
+		t.Fatalf("expected >= 4 aggregated field errors, got %d: %v", len(ve), ve)
 	}
-}
-
-func keysOf(m map[string]string) []string {
-	out := make([]string, 0, len(m))
-	for k := range m {
-		out = append(out, k)
-	}
-	return out
 }
 
 func TestValidateTargetErrors(t *testing.T) {
@@ -221,25 +155,8 @@ func TestValidateTargetErrors(t *testing.T) {
 				},
 			}
 			_, err := Validate(raw, Options{AgentCount: 1})
-			if err == nil {
-				t.Fatalf("Validate accepted invalid target %q", tt.target)
-			}
-			ve, ok := err.(ValidationErrors)
-			if !ok {
-				t.Fatalf("error is %T, want ValidationErrors", err)
-			}
-			const wantField = "scenarios[0].targets[0]"
-			var found bool
-			for _, fe := range ve {
-				if fe.Field == wantField && strings.Contains(fe.Msg, tt.wantSub) {
-					found = true
-					break
-				}
-			}
-			if !found {
-				t.Fatalf("target %q: no FieldError at %q containing %q; got %v",
-					tt.target, wantField, tt.wantSub, ve)
-			}
+			ve := requireValidationErrors(t, err)
+			assertFieldError(t, ve, "scenarios[0].targets[0]", tt.wantSub)
 		})
 	}
 }
@@ -319,35 +236,17 @@ func TestValidateInsecureGate(t *testing.T) {
 			}
 			sc, err := Validate(raw, Options{AllowInsecure: tt.optAllow, AgentCount: 1})
 
-			if tt.wantValid {
-				if err != nil {
-					t.Fatalf("expected valid, got error: %v", err)
-				}
-				if sc.Blocks[0].AllowInsecure != tt.allowInsec {
-					t.Fatalf("Block.AllowInsecure = %v, want %v", sc.Blocks[0].AllowInsecure, tt.allowInsec)
-				}
-				if tt.allowInsec && sc.Blocks[0].AllowInsecureReason != tt.reason {
-					t.Fatalf("Block.AllowInsecureReason = %q, want %q", sc.Blocks[0].AllowInsecureReason, tt.reason)
-				}
+			if !tt.wantValid {
+				assertFieldError(t, requireValidationErrors(t, err), tt.wantField, tt.wantMsgSub)
 				return
 			}
 
-			if err == nil {
-				t.Fatalf("expected a validation error, got nil")
+			if err != nil {
+				t.Fatalf("expected valid, got error: %v", err)
 			}
-			ve, ok := err.(ValidationErrors)
-			if !ok {
-				t.Fatalf("error is %T, want ValidationErrors", err)
-			}
-			var found bool
-			for _, fe := range ve {
-				if fe.Field == tt.wantField && strings.Contains(fe.Msg, tt.wantMsgSub) {
-					found = true
-					break
-				}
-			}
-			if !found {
-				t.Fatalf("missing FieldError at %q containing %q; got %v", tt.wantField, tt.wantMsgSub, ve)
+			assertEqual(t, "Block.AllowInsecure", sc.Blocks[0].AllowInsecure, tt.allowInsec)
+			if tt.allowInsec {
+				assertEqual(t, "Block.AllowInsecureReason", sc.Blocks[0].AllowInsecureReason, tt.reason)
 			}
 		})
 	}
@@ -358,23 +257,7 @@ func TestValidateCapsOverCeiling(t *testing.T) {
 
 	// per_target_rps 11 > ceiling 10 (agentCount=1), no override -> FieldError.
 	_, err := Validate(raw, Options{AgentCount: 1, CapOverride: false})
-	if err == nil {
-		t.Fatalf("expected a violation for per_target_rps 11 over ceiling 10")
-	}
-	ve, ok := err.(ValidationErrors)
-	if !ok {
-		t.Fatalf("error is %T, want ValidationErrors", err)
-	}
-	var found bool
-	for _, fe := range ve {
-		if fe.Field == "caps.per_target_rps" {
-			found = true
-			break
-		}
-	}
-	if !found {
-		t.Fatalf("missing FieldError at caps.per_target_rps; got %v", ve)
-	}
+	assertFieldError(t, requireValidationErrors(t, err), "caps.per_target_rps", "")
 }
 
 func TestValidateCapsOverrideAllowsExceedingCeiling(t *testing.T) {
@@ -409,23 +292,7 @@ func TestValidateAgentCountHalvesCeiling(t *testing.T) {
 	// agentCount 2: 6 > 5 -> violation at caps.per_target_rps, and the stored
 	// ceiling reflects the division.
 	_, err := Validate(raw, Options{AgentCount: 2})
-	if err == nil {
-		t.Fatalf("per_target_rps 6 should violate the halved ceiling (5) at agentCount=2")
-	}
-	ve, ok := err.(ValidationErrors)
-	if !ok {
-		t.Fatalf("error is %T, want ValidationErrors", err)
-	}
-	var found bool
-	for _, fe := range ve {
-		if fe.Field == "caps.per_target_rps" {
-			found = true
-			break
-		}
-	}
-	if !found {
-		t.Fatalf("missing FieldError at caps.per_target_rps for halved ceiling; got %v", ve)
-	}
+	assertFieldError(t, requireValidationErrors(t, err), "caps.per_target_rps", "")
 }
 
 func TestValidateAgentCountStoresDividedCeiling(t *testing.T) {

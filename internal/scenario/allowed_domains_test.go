@@ -14,23 +14,7 @@ func TestValidateRejectsMalformedAllowedDomain(t *testing.T) {
 		},
 	}
 	_, err := Validate(raw, Options{AgentCount: 1})
-	if err == nil {
-		t.Fatalf("Validate accepted a malformed allowed_domains entry")
-	}
-	ve, ok := err.(ValidationErrors)
-	if !ok {
-		t.Fatalf("error is %T, want ValidationErrors", err)
-	}
-	var found bool
-	for _, fe := range ve {
-		if fe.Field == "allowed_domains[1]" {
-			found = true
-			break
-		}
-	}
-	if !found {
-		t.Fatalf("missing FieldError at allowed_domains[1]; got %v", ve)
-	}
+	assertFieldError(t, requireValidationErrors(t, err), "allowed_domains[1]", "")
 }
 
 // TestValidateAcceptsValidAllowedDomains confirms well-formed allowed_domains
