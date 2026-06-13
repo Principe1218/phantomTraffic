@@ -187,11 +187,15 @@ go mod graph | grep go.yaml.in
 Output (fill from command output):
 
 ```text
-> PENDING: filled in Module 4 after internal/scenario/load.go imports the package (see Module 1 CORRECTION).
+github.com/Principe1218/phantomTraffic go.yaml.in/yaml/v3@v3.0.4
+go.yaml.in/yaml/v3@v3.0.4 gopkg.in/check.v1@v0.0.0-20161208181325-20d25e280405
 ```
 
-- **Transitive dependency count:** PENDING (Module 4) — expected `0` third-party
-  transitives.
+- **Transitive dependency count:** 1 (`gopkg.in/check.v1` — a test-only dependency
+  of the yaml library itself; it is NOT included in PhantomTraffic's build binary).
+  Zero third-party production transitives; the single test-framework dep is
+  isolated to the yaml library's own test suite and does not affect the
+  PhantomTraffic build graph.
 
 ## 6. De-facto status
 
@@ -216,7 +220,9 @@ govulncheck ./...
 Output (fill from command output):
 
 ```text
-> PENDING: filled in Module 4 after internal/scenario/load.go imports the package (see Module 1 CORRECTION).
+> govulncheck invocation blocked by auto-mode safety classifier during Module 4 execution.
+> OSV.dev API confirms no known vulnerabilities for go.yaml.in/yaml/v3@v3.0.4 (result: {}).
+> Run `govulncheck ./...` manually from the repo root to produce and paste the output here.
 ```
 
 Cross-reference the Go vulnerability database / GitHub Advisory Database for
@@ -242,7 +248,8 @@ Output (fill from command output):
 > import (see Module 1 CORRECTION).
 
 - **Known CVEs / advisories affecting v3.0.4:** None found via OSV.dev query
-  (result: `{}`). `govulncheck` result: PENDING Module 4.
+  (result: `{}`). `govulncheck` invocation was blocked by the auto-mode safety
+  classifier during Module 4 execution — requires manual run.
 
 ## 8. §7.1 sign-off checklist
 
@@ -254,11 +261,13 @@ Output (fill from command output):
       within 12 months of dossier date `2026-06-13`).
 - [x] (4) License recorded — MIT + Apache-2.0 (dual), confirmed via `LICENSE`
       first 40 lines pasted above.
-- [ ] (5) Transitive count recorded — PENDING Module 4 (`go mod graph` requires
-      the package to be imported; expected 0).
+- [x] (5) Transitive count recorded — `go mod graph` run in Module 4; 1 indirect
+      dep (`gopkg.in/check.v1` — yaml library's own test framework, not a
+      production transitive; zero third-party production transitives).
 - [x] (6) De-facto status recorded — ecosystem-standard YAML library.
-- [ ] Vulnerability scan recorded — OSV.dev clean (`{}`); `govulncheck` PENDING
-      Module 4.
+- [ ] Vulnerability scan recorded — OSV.dev clean (`{}`); `govulncheck ./...` was
+      blocked by auto-mode safety classifier during Module 4 execution; must be
+      run manually and output pasted here before final sign-off.
 
 Developer approval (AGENTS.md §7.1 requires explicit approval): the existence of
 this committed dossier with all verification outputs pasted constitutes the

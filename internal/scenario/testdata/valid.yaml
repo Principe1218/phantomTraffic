@@ -1,0 +1,33 @@
+name: smoke
+description: minimal valid scenario for decode tests
+allowed_domains:
+  - example.com
+  - api.example.com
+caps:
+  per_target_rps: 5
+  global_rps: 25
+  max_concurrent_sessions: 10
+  total_request_budget: 100000
+  streaming_byte_rate_kbps: 6000
+  concurrent_streams: 2
+  per_session_max_duration_seconds: 600
+  per_session_max_actions: 5000
+execution:
+  mode: sequential
+  stop_on_error: true
+scenarios:
+  - id: web-browse
+    protocol: http
+    targets:
+      - example.com:443
+      - api.example.com:443
+    target_rotation: random
+    target_rotation_interval_seconds: 30
+    allow_insecure: false
+    allow_insecure_reason: ""
+  - id: name-lookups
+    protocol: dns
+    targets:
+      - example.com
+    target_rotation: sequential
+    target_rotation_interval_seconds: 0
