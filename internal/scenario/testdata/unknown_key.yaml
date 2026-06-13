@@ -6,4 +6,4 @@ scenarios:
     protocol: http
     targets:
       - example.com:443
-    allow_inscure: true
+    allow_insecure: true

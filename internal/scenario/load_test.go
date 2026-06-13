@@ -115,13 +115,13 @@ func TestLoadRejectsUnknownKey(t *testing.T) {
 	}
 
 	// The decoder's underlying message should mention the offending field so an
-	// operator can find the typo. yaml.v3 reports it as "field allow_inscure not found".
+	// operator can find the typo. yaml.v3 reports it as "field allow_insecure not found".
 	cause := pe.Unwrap()
 	if cause == nil {
 		t.Fatal("expected the *pterr.Error to wrap the decoder's cause")
 	}
-	if !strings.Contains(cause.Error(), "allow_inscure") {
-		t.Fatalf("wrapped cause = %q, want it to mention the unknown field allow_inscure", cause.Error())
+	if !strings.Contains(cause.Error(), "allow_insecure") {
+		t.Fatalf("wrapped cause = %q, want it to mention the unknown field allow_insecure", cause.Error())
 	}
 }
 
