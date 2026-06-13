@@ -15,3 +15,33 @@ type SessionID string
 // NavID groups the sub-resources of one page-load (or one logical DNS
 // resolution) into a single logical unit. "" means "not applicable".
 type NavID string
+
+// Canonical ProtocolID values. These four identifiers are the complete,
+// authoritative allowlist of protocols PhantomTraffic supports. ProtocolID is
+// never derived from untrusted input, but membership is still checked
+// fail-closed via IsKnownProtocol so a typo or unsupported value is rejected.
+const (
+	ProtoHTTP   ProtocolID = "http"
+	ProtoDNS    ProtocolID = "dns"
+	ProtoSSH    ProtocolID = "ssh"
+	ProtoStream ProtocolID = "stream"
+)
+
+// knownProtocols is the single source of truth for the supported-protocol
+// allowlist. It is unexported and never mutated after package init, so callers
+// cannot tamper with the set; they observe it only through IsKnownProtocol and
+// KnownProtocols.
+var knownProtocols = map[ProtocolID]struct{}{
+	ProtoHTTP:   {},
+	ProtoDNS:    {},
+	ProtoSSH:    {},
+	ProtoStream: {},
+}
+
+// IsKnownProtocol reports whether p is one of the four supported protocols.
+// The match is exact and case-sensitive (an empty string or "HTTP" is not
+// known). This is the only membership test callers should use.
+func IsKnownProtocol(p ProtocolID) bool {
+	_, ok := knownProtocols[p]
+	return ok
+}
