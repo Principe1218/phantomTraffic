@@ -104,7 +104,7 @@ func replay(path string) (nextSeq uint64, tailHash string, err error) {
 			continue
 		}
 		var r Record
-		if jsonErr := json.Unmarshal(line, &r); jsonErr != nil {
+		if json.Unmarshal(line, &r) != nil {
 			return 0, "", fmt.Errorf("%w: record %d is not valid JSON", ErrChainBroken, seq)
 		}
 		if r.Seq != seq {

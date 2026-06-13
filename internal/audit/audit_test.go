@@ -162,7 +162,7 @@ func TestRecordHashChangesWithEveryField(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			r := mkRecord()
 			mut(&r)
-			if got := audit.HashRecordForTest(r); got == base {
+			if audit.HashRecordForTest(r) == base {
 				t.Fatalf("mutating %s did not change the hash", name)
 			}
 		})
@@ -205,6 +205,52 @@ func readRecords(t *testing.T, path string) []audit.Record {
 	return recs
 }
 
+// mustAppend appends an event and fails the test on error, collapsing the
+// repetitive inline error check at call sites.
+func mustAppend(t *testing.T, sink audit.Sink, e audit.Event) {
+	t.Helper()
+	if err := sink.Append(e); err != nil {
+		t.Fatalf("append %s/%s: %v", e.Action, e.Resource, err)
+	}
+}
+
+// assertRecordFields checks per-record Seq (0-based monotonic), AgentID, and the
+// injected-clock timestamps.
+func assertRecordFields(t *testing.T, recs []audit.Record, agentID string, wantTimes []time.Time) {
+	t.Helper()
+	if len(recs) != len(wantTimes) {
+		t.Fatalf("got %d records, want %d", len(recs), len(wantTimes))
+	}
+	for i, r := range recs {
+		if r.Seq != uint64(i) {
+			t.Errorf("record %d Seq = %d, want %d", i, r.Seq, i)
+		}
+		if r.AgentID != agentID {
+			t.Errorf("record %d AgentID = %q, want %s", i, r.AgentID, agentID)
+		}
+		if !r.Time.Equal(wantTimes[i]) {
+			t.Errorf("record %d Time = %v, want %v (injected clock)", i, r.Time, wantTimes[i])
+		}
+	}
+}
+
+// assertHashChain checks that record 0 carries the fixed genesis PrevHash and
+// that every subsequent PrevHash equals the prior record's Hash.
+func assertHashChain(t *testing.T, recs []audit.Record) {
+	t.Helper()
+	if len(recs) == 0 {
+		t.Fatal("no records to verify the hash chain")
+	}
+	if recs[0].PrevHash == "" {
+		t.Error("record 0 PrevHash should be the fixed genesis hash, not empty")
+	}
+	for i := 1; i < len(recs); i++ {
+		if recs[i].PrevHash != recs[i-1].Hash {
+			t.Errorf("record %d PrevHash %q != record %d Hash %q", i, recs[i].PrevHash, i-1, recs[i-1].Hash)
+		}
+	}
+}
+
 func TestFileSinkAppendAndVerify(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "audit.log")
@@ -215,22 +261,16 @@ func TestFileSinkAppendAndVerify(t *testing.T) {
 		t.Fatalf("NewFileSink: %v", err)
 	}
 
-	if err := sink.Append(audit.Event{Actor: "cli", Action: audit.ActionScenarioStarted, Resource: "run-1"}); err != nil {
-		t.Fatalf("append 0: %v", err)
-	}
+	mustAppend(t, sink, audit.Event{Actor: "cli", Action: audit.ActionScenarioStarted, Resource: "run-1"})
 	clk.Advance(2 * time.Minute)
-	if err := sink.Append(audit.Event{
+	mustAppend(t, sink, audit.Event{
 		Actor:    "ui",
 		Action:   audit.ActionCapOverrideEnabled,
 		Resource: "run-1",
 		Detail:   map[string]string{"new_global_rps": "100"},
-	}); err != nil {
-		t.Fatalf("append 1: %v", err)
-	}
+	})
 	clk.Advance(time.Minute)
-	if err := sink.Append(audit.Event{Actor: "cli", Action: audit.ActionScenarioStopped, Resource: "run-1"}); err != nil {
-		t.Fatalf("append 2: %v", err)
-	}
+	mustAppend(t, sink, audit.Event{Actor: "cli", Action: audit.ActionScenarioStopped, Resource: "run-1"})
 
 	if err := sink.Verify(); err != nil {
 		t.Fatalf("Verify after 3 appends: %v", err)
@@ -240,38 +280,13 @@ func TestFileSinkAppendAndVerify(t *testing.T) {
 	}
 
 	recs := readRecords(t, path)
-	if len(recs) != 3 {
-		t.Fatalf("got %d records, want 3", len(recs))
-	}
-	// Seq is 0-based monotonic.
-	for i, r := range recs {
-		if r.Seq != uint64(i) {
-			t.Errorf("record %d Seq = %d, want %d", i, r.Seq, i)
-		}
-		if r.AgentID != "agent-A" {
-			t.Errorf("record %d AgentID = %q, want agent-A", i, r.AgentID)
-		}
-	}
-	// Timestamps come from the injected clock, not wall-clock.
 	wantTimes := []time.Time{
 		time.Date(2026, 6, 11, 9, 0, 0, 0, time.UTC),
 		time.Date(2026, 6, 11, 9, 2, 0, 0, time.UTC),
 		time.Date(2026, 6, 11, 9, 3, 0, 0, time.UTC),
 	}
-	for i, want := range wantTimes {
-		if !recs[i].Time.Equal(want) {
-			t.Errorf("record %d Time = %v, want %v (injected clock)", i, recs[i].Time, want)
-		}
-	}
-	// Chain: record 0 PrevHash is genesis-fixed; each PrevHash == prior Hash.
-	if recs[0].PrevHash == "" {
-		t.Error("record 0 PrevHash should be the fixed genesis hash, not empty")
-	}
-	for i := 1; i < len(recs); i++ {
-		if recs[i].PrevHash != recs[i-1].Hash {
-			t.Errorf("record %d PrevHash %q != record %d Hash %q", i, recs[i].PrevHash, i-1, recs[i-1].Hash)
-		}
-	}
+	assertRecordFields(t, recs, "agent-A", wantTimes)
+	assertHashChain(t, recs)
 }
 
 func TestFileSinkAppendRejectsSecretAndDoesNotWrite(t *testing.T) {
