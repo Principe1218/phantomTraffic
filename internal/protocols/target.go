@@ -9,7 +9,7 @@ import (
 // Target carries an endpoint + a CredentialRef (NEVER secret bytes) + an
 // optional proxy/jump chain (SSH bastions). Safe to serialize to YAML and
 // stream to the UI (design §2). The credential is an opaque handle resolved
-// lazily inside the handler via secret.CredentialSource (AGENTS.md §3.1).
+// lazily inside the handler via secret.CredentialResolver (AGENTS.md §3.1).
 type Target struct {
 	ID    string
 	Proto ProtocolID

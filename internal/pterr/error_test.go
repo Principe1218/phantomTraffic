@@ -128,7 +128,7 @@ func TestClassifyAndIsClass(t *testing.T) {
 
 // errorsJoin builds a genuine 2-element joined error so errors.As/Is must traverse
 // a real multi-error Unwrap tree (errors.Join's Unwrap() []error form) to reach inner.
-func errorsJoin(outer error, inner error) error {
+func errorsJoin(outer, inner error) error {
 	return errors.Join(outer, inner)
 }
 

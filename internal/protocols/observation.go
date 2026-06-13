@@ -4,7 +4,7 @@ import "time"
 
 // Observation is the IN-PROCESS-ONLY control-feedback channel for the
 // behavior layer's branching/ABR/cache loops (design §2). It NEVER reaches
-// StatsSink, logs, or the UI.
+// StatsRecorder, logs, or the UI.
 //
 // LIFETIME/ALIASING CONTRACT: Observation is passed BY VALUE and contains
 // ONLY value types and bounded scalars. It carries NO pointers into

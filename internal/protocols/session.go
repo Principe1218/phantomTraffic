@@ -36,10 +36,10 @@ type SessionDeps struct {
 	Clock     clock.Clock
 	Rand      rng.Rand     // non-crypto shaping RNG (§7)
 	Log       *slog.Logger // pre-tagged with session/request id; never passed secrets
-	Stats     StatsSink
+	Stats     StatsRecorder
 	Caps      safety.Caps             // effective (merged, most-restrictive) caps for this session
 	Audit     audit.Sink              // append-only local audit log for security-relevant events (§7)
-	CredSrc   secret.CredentialSource // resolves CredentialRef -> key bytes LAZILY, inside handler only
+	CredSrc   secret.CredentialResolver // resolves CredentialRef -> key bytes LAZILY, inside handler only
 	Shared    SharedState             // process-wide caches the realism needs
 	Transport TransportProbe          // injectable byte/throughput source — REAL in prod, scripted in tests (§8)
 }
@@ -52,10 +52,10 @@ type SharedState struct {
 	JarGroups *cookie.Registry // cookie jars keyed by session-group; internally mutex-safe
 }
 
-// StatsSink receives SCRUBBED Results only (never Observation). It is the
+// StatsRecorder receives SCRUBBED Results only (never Observation). It is the
 // engine's race-free aggregation entry point; the contract layer depends only
 // on the interface so handlers and behavior never import the engine.
-type StatsSink interface {
+type StatsRecorder interface {
 	Record(r Result)
 }
 
@@ -63,6 +63,6 @@ type StatsSink interface {
 // In production it reports real socket bytes against the real Clock; in tests
 // a fake probe reports SCRIPTED byte counts against fake-clock advances, so
 // "actual throughput" = bytesObserved / Clock.Since(start) is deterministic.
-type TransportProbe interface {
+type TransportProbe interface { // NOSONAR — BytesObserved has no natural -er agent noun; TransportProbe is the established domain term
 	BytesObserved(sess SessionID) int64
 }

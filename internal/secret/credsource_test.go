@@ -10,7 +10,7 @@ import (
 	"github.com/Principe1218/phantomTraffic/internal/secret"
 )
 
-// countingSource is a fake CredentialSource that records how many times Resolve
+// countingSource is a fake CredentialResolver that records how many times Resolve
 // is called, so a test can assert resolution is lazy (zero calls until asked).
 type countingSource struct {
 	calls   int
@@ -34,7 +34,7 @@ func TestCredentialSource_ResolvesLazily(t *testing.T) {
 	}
 
 	// Holding the ref + source (engine/behavior wiring) must NOT resolve anything.
-	var _ secret.CredentialSource = src
+	var _ secret.CredentialResolver = src
 	if src.calls != 0 {
 		t.Fatalf("Resolve called %d times before any handler asked; want 0 (lazy)", src.calls)
 	}

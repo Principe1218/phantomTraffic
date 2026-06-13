@@ -51,7 +51,7 @@ func (k RefKind) String() string {
 // bytes — only a non-secret Kind + ID label — so it is safe to store on a
 // Target and stream to the UI. (There is no MarshalYAML method yet, so YAML
 // serialization is not specially guaranteed by this type.) Secret material is
-// resolved lazily, inside a protocol handler, via CredentialSource.Resolve.
+// resolved lazily, inside a protocol handler, via CredentialResolver.Resolve.
 type CredentialRef struct {
 	kind RefKind
 	id   string
@@ -109,11 +109,11 @@ func (r CredentialRef) LogValue() slog.Value {
 	)
 }
 
-// CredentialSource resolves a CredentialRef to its Secret material LAZILY.
+// CredentialResolver resolves a CredentialRef to its Secret material LAZILY.
 // Implementations (env var, secrets manager, prompt) perform the lookup only
 // when Resolve is called — never at wiring time. Resolve is invoked ONLY inside
 // a protocol handler; the engine and behavior layers hold the interface and a
 // CredentialRef, never the resolved Secret (design §2 SessionDeps.CredSrc).
-type CredentialSource interface {
+type CredentialResolver interface {
 	Resolve(ctx context.Context, ref CredentialRef) (*Secret, error)
 }

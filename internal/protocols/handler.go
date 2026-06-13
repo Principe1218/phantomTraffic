@@ -21,7 +21,7 @@ type ProtocolHandler interface {
 // unexported marker method makes it un-forgeable outside the package that
 // defines a concrete state; engine and behavior can only hold it and hand it
 // back to CloseState — they never read its internals.
-type SessionState interface{ isSessionState() }
+type SessionState interface{ isSessionState() } // NOSONAR — marker interface; unexported method is the intentional un-forgeable seal
 
 // Capability is the pure, no-I/O description a handler advertises for
 // discovery and config validation (design §2). It lists the supported
