@@ -6,6 +6,7 @@ package main
 import (
 	"io"
 	"os"
+	"strconv"
 )
 
 func main() {
@@ -28,7 +29,7 @@ func dispatch(args []string, stdout, stderr io.Writer) int {
 		return runValidate(args[1:], stdout, stderr)
 	default:
 		// Unknown subcommand is an operator/usage error: usage to stderr, code 2.
-		_, _ = io.WriteString(stderr, "phantom: unknown subcommand "+quote(args[0])+"\n")
+		_, _ = io.WriteString(stderr, "phantom: unknown subcommand "+strconv.Quote(args[0])+"\n")
 		usage(stderr)
 		return 2
 	}
@@ -45,11 +46,4 @@ Commands:
 Run "phantom validate -h" for validate flags.
 `
 	_, _ = io.WriteString(w, text)
-}
-
-// quote wraps s in double quotes for stable, injection-free error messages.
-// It avoids fmt to keep the dispatch hot path dependency-free; s is an
-// operator-supplied subcommand token, never a secret.
-func quote(s string) string {
-	return "\"" + s + "\""
 }

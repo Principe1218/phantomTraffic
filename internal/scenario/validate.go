@@ -239,6 +239,15 @@ func Validate(raw Raw, opts Options) (Scenario, error) {
 		blocks = append(blocks, b)
 	}
 
+	// allowed_domains are host-only allowlist entries (no port). Validate each so a
+	// malformed entry can't silently become a dead, never-matching allowlist row
+	// (design §5.2 — allowed_domains are host-validated, like targets).
+	for i, d := range raw.AllowedDomains {
+		if !validHost(strings.TrimSpace(d)) {
+			acc.add("allowed_domains["+strconv.Itoa(i)+"]", "not a valid hostname")
+		}
+	}
+
 	// Caps: map -> validate against the (divided) effective ceiling.
 	ceiling := safety.DefaultCeiling().DividedBy(agentCount)
 	declared := toCapSpec(raw.Caps)
