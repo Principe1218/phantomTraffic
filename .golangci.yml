@@ -1,0 +1,43 @@
+version: "2"
+
+run:
+  timeout: 5m
+
+linters:
+  default: none
+  enable:
+    - depguard
+    - forbidigo
+    - govet
+    - ineffassign
+    - staticcheck
+    - unused
+  settings:
+    depguard:
+      rules:
+        no-math-rand:
+          list-mode: lax
+          files:
+            - '!**/internal/rng/**'
+            - '!**/internal/behavior/**'
+          deny:
+            - pkg: 'math/rand'
+              desc: 'non-CSPRNG: math/rand is allowed only in internal/rng and internal/behavior. Use crypto/rand via internal/idgen for security-sensitive values, or the injected rng.Rand for traffic shaping.'
+            - pkg: 'math/rand/v2'
+              desc: 'non-CSPRNG: math/rand/v2 is allowed only in internal/rng and internal/behavior. Use crypto/rand via internal/idgen for security-sensitive values, or the injected rng.Rand for traffic shaping.'
+    forbidigo:
+      analyze-types: true
+      forbid:
+        - pattern: '^time\.Now$'
+          msg: 'inject clock.Clock and call Now(); time.Now is banned in internal/behavior for determinism'
+        - pattern: '^time\.Sleep$'
+          msg: 'the engine performs the sleep via clock.Clock; time.Sleep is banned in internal/behavior'
+        - pattern: '^rand\.'
+          msg: 'use the injected rng.Rand, not a package-global rand function, inside internal/behavior'
+  exclusions:
+    rules:
+      # forbidigo applies ONLY inside internal/behavior: exclude it everywhere else.
+      # Go regexp has no negative lookahead, so path-except (positive match) is used.
+      - path-except: '(^|/)internal/behavior/'
+        linters:
+          - forbidigo
