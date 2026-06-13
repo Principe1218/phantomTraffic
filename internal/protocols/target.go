@@ -1,6 +1,10 @@
 package protocols
 
-import "strings"
+import (
+	"strings"
+
+	"github.com/Principe1218/phantomTraffic/internal/secret"
+)
 
 // Target carries an endpoint + a CredentialRef (NEVER secret bytes) + an
 // optional proxy/jump chain (SSH bastions). Safe to serialize to YAML and
@@ -9,19 +13,10 @@ import "strings"
 type Target struct {
 	ID    string
 	Proto ProtocolID
-	Addr  string              // host[:port] — validated upstream; never a raw user string into a dialer
-	Cred  secretCredentialRef // opaque handle; resolved lazily inside the handler
-	Proxy []Target            // ordered SSH ProxyJump chain (each with its own Cred); nil if none
+	Addr  string               // host[:port] — validated upstream; never a raw user string into a dialer
+	Cred  secret.CredentialRef // opaque handle; resolved lazily inside the handler
+	Proxy []Target             // ordered SSH ProxyJump chain (each with its own Cred); nil if none
 }
-
-// secretCredentialRef is a local alias of secret.CredentialRef so this file's
-// signature matches design §2 exactly while keeping the import explicit at the
-// package boundary. The real type lives in internal/secret.
-//
-// NOTE: replace the alias with the direct import `secret.CredentialRef` once
-// internal/secret is on the module path; the alias exists only so this task's
-// file is self-describing. Both forms are interchangeable at the type level.
-type secretCredentialRef = secretRef
 
 // TargetSet is the AUTHORITATIVE navigation allowlist (design §2, §7). Every
 // wire request — including HTTP redirects and discovered follow-link hops —
