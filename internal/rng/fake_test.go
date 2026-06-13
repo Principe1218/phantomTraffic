@@ -37,7 +37,7 @@ func TestNewFake_DrivesScriptedSequencesInOrder(t *testing.T) {
 
 func TestNewFake_PanicsWhenScriptExhausted(t *testing.T) {
 	defer func() {
-		if r := recover(); r == nil {
+		if recover() == nil {
 			t.Fatal("expected panic when Float64 script is exhausted, got none")
 		}
 	}()
