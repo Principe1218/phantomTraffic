@@ -79,8 +79,14 @@ func (n Normal) Name() string { return "normal" }
 // as Scale * exp(Mu + Sigma*z), where z is one rng.Rand.NormFloat64 draw. Mu/Sigma are
 // dimensionless log-space parameters; Scale is the duration unit (defaults to one
 // second when zero). exp() only transforms the delegated Gaussian draw — no numeric
-// sampler is implemented here (AGENTS.md §2.1). exp is always >= 0, but the shared
-// non-negative clamp is applied for contract uniformity.
+// sampler is implemented here (AGENTS.md §2.1). exp() is always >= 0, so the result is
+// non-negative by construction.
+//
+// Edge cases are defined, not undefined: a NaN parameter yields 0, and an extreme Mu
+// where exp() overflows to +Inf saturates to the maximum representable duration
+// (~292 years) rather than producing a garbage value. Pathological Mu/Sigma are
+// expected to be rejected by config validation (a later layer); this is the bounded
+// primitive-level fallback.
 type LogNormal struct {
 	Mu, Sigma float64
 	Scale     time.Duration
@@ -92,7 +98,11 @@ func (l LogNormal) Sample(r rng.Rand) time.Duration {
 		scale = time.Second
 	}
 	z := r.NormFloat64()
-	d := time.Duration(math.Exp(l.Mu+l.Sigma*z) * float64(scale))
+	f := math.Exp(l.Mu+l.Sigma*z) * float64(scale)
+	if math.IsNaN(f) {
+		return 0
+	}
+	d := time.Duration(f)
 	return clampNonNeg(d)
 }
 

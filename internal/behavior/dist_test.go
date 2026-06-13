@@ -281,6 +281,8 @@ func TestSampleNeverNegative(t *testing.T) {
 		{"Uniform negative window", Uniform{Min: -5 * time.Second, Max: -1 * time.Second}, &fakeRand{floats: []float64{0.5}}},
 		{"Normal negative tail", Normal{Mean: 0, StdDev: 1 * time.Second, Min: -10 * time.Second, Max: 10 * time.Second}, &fakeRand{norms: []float64{-4.0}}},
 		{"Exponential negative mean", Exponential{Mean: -2 * time.Second}, &fakeRand{exps: []float64{2.0}}},
+		{"LogNormal very negative z", LogNormal{Mu: -5, Sigma: 2.0, Scale: time.Second}, &fakeRand{norms: []float64{-3.0}}},
+		{"LogNormal NaN parameter yields 0", LogNormal{Mu: math.NaN(), Sigma: 1.0, Scale: time.Second}, &fakeRand{norms: []float64{0.0}}},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
