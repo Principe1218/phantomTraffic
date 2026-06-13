@@ -7,6 +7,47 @@
 
 ---
 
+## Startup Instructions
+
+Before executing any task, always:
+
+1. Parallelize all read-only tasks (research, searching, file reads, exploration agents) — run them
+   concurrently whenever possible, including across phases. For write tasks (code edits, file
+   creation, commits), use git worktrees to isolate each agent so they don't conflict on shared
+   working-directory state. Sequence writes when worktrees aren't feasible.
+
+---
+
+## Test-Driven Development
+
+All coding tasks — features, bug fixes, refactors — must follow TDD (red-green-refactor):
+
+1. **Red:** Write a failing test that defines the expected behavior
+2. **Green:** Write the minimum implementation to make the test pass
+3. **Refactor:** Clean up while keeping tests green
+
+This applies to both Go (`go test`) and TypeScript.
+
+---
+
+## Follow Best Practices
+
+Before starting to code, modify, test, review, or perform any other code-related task, look for the
+language's best practices guide. Use the provided links, and if none is provided, look for official
+documentation.
+
+### Best Practice Links
+
+- Go: [Effective Go](https://go.dev/doc/effective_go)
+- TypeScript: [TypeScript Style Guide](https://ts.dev/style/)
+
+### Markdown
+
+When creating, editing, or doing any modification to a markdown file, follow the rules detailed
+here: [Markdownlint](https://github.com/markdownlint/markdownlint/blob/main/docs/RULES.md)
+
+---
+
 ## 0. Overarching Principle
 
 **Security is not a feature — it is a baseline.**

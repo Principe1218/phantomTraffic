@@ -1,0 +1,10 @@
+// This file is intentionally NOT a .go file. It is a planted-violation sample
+// for the documented manual lint check in the repository task plan. Copying it
+// to internal/clock/forbidden_rand.go and running golangci-lint MUST produce a
+// depguard violation, proving the math/rand boundary lint is wired correctly.
+package clock
+
+import "math/rand"
+
+// PlantedViolation uses a forbidden non-CSPRNG outside internal/rng / behavior.
+func PlantedViolation() int { return rand.Intn(100) }
