@@ -17,8 +17,9 @@ type FakeClock struct {
 	waiters []*fakeWaiter
 }
 
-// fakeWaiter is a registered timer, AfterFunc, or Sleep. Exactly one of fn (run
-// in a goroutine on fire) or a channel send (ch, for timers and Sleep) happens.
+// fakeWaiter is a registered timer, AfterFunc, or Sleep. Exactly one of fn
+// (called synchronously in deadline order, without holding mu) or a channel
+// send (ch, for timers and Sleep) happens.
 type fakeWaiter struct {
 	deadline time.Time
 	ch       chan time.Time
@@ -44,28 +45,34 @@ func (c *FakeClock) Since(t time.Time) time.Duration {
 
 // addWaiter registers a waiter; caller MUST hold c.mu. A non-positive duration
 // fires immediately so a zero-delay timer/AfterFunc behaves like the real clock.
-func (c *FakeClock) addWaiter(d time.Duration, fn func()) *fakeWaiter {
+// Returns the fn to call (if any) after the caller releases the lock; returns
+// nil when no post-lock call is needed (channel-based waiters send under the lock).
+func (c *FakeClock) addWaiter(d time.Duration, fn func()) (*fakeWaiter, func()) {
 	w := &fakeWaiter{deadline: c.now.Add(d), ch: make(chan time.Time, 1), fn: fn}
 	if d <= 0 {
-		c.fire(w)
-		return w
+		c.fire(w) // marks fired; sends on channel if fn == nil
+		if fn != nil {
+			return w, fn // caller must invoke fn() after releasing mu
+		}
+		return w, nil
 	}
 	c.waiters = append(c.waiters, w)
-	return w
+	return w, nil
 }
 
-// fire delivers the waiter exactly once; caller MUST hold c.mu. Callbacks run in
-// their own goroutine so a callback that re-enters the clock cannot deadlock on mu.
+// fire delivers the waiter exactly once; caller MUST hold c.mu.
+// Channel-based waiters (Timer/Sleep) receive on their buffered channel.
+// AfterFunc waiters are NOT called here — fireDueLocked collects them and
+// calls fn() after releasing the lock to avoid re-entrance deadlocks.
 func (c *FakeClock) fire(w *fakeWaiter) {
 	if w.fired || w.stopped {
 		return
 	}
 	w.fired = true
-	if w.fn != nil {
-		go w.fn()
-		return
+	if w.fn == nil {
+		w.ch <- w.deadline
 	}
-	w.ch <- w.deadline
+	// fn != nil: caller (fireDueLocked) is responsible for invoking fn().
 }
 
 // fakeTimer adapts a waiter to the Timer interface.
@@ -89,13 +96,18 @@ func (t *fakeTimer) Stop() bool {
 func (c *FakeClock) NewTimer(d time.Duration) Timer {
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	return &fakeTimer{c: c, w: c.addWaiter(d, nil)}
+	w, _ := c.addWaiter(d, nil)
+	return &fakeTimer{c: c, w: w}
 }
 
 func (c *FakeClock) AfterFunc(d time.Duration, f func()) Timer {
 	c.mu.Lock()
-	defer c.mu.Unlock()
-	return &fakeTimer{c: c, w: c.addWaiter(d, f)}
+	w, immediate := c.addWaiter(d, f)
+	c.mu.Unlock()
+	if immediate != nil {
+		immediate() // zero-duration: call synchronously without holding mu
+	}
+	return &fakeTimer{c: c, w: w}
 }
 
 // Sleep blocks until logical time reaches now+d (via Advance/Set) or ctx is
@@ -109,7 +121,7 @@ func (c *FakeClock) Sleep(ctx context.Context, d time.Duration) error {
 		return nil
 	}
 	c.mu.Lock()
-	w := c.addWaiter(d, nil)
+	w, _ := c.addWaiter(d, nil)
 	c.mu.Unlock()
 	select {
 	case <-w.ch:
@@ -124,24 +136,33 @@ func (c *FakeClock) Sleep(ctx context.Context, d time.Duration) error {
 
 // Advance moves logical time forward by d and fires every waiter whose deadline
 // is now at or before the new time, in ascending deadline order.
+// AfterFunc callbacks are invoked synchronously after the lock is released.
 func (c *FakeClock) Advance(d time.Duration) {
 	c.mu.Lock()
-	defer c.mu.Unlock()
 	c.now = c.now.Add(d)
-	c.fireDueLocked()
+	c.fireDueLocked() // releases and re-acquires mu around AfterFunc callbacks
+	c.mu.Unlock()
 }
 
 // Set moves logical time to t. If t is in the future it fires due waiters in
 // order; if t is in the past it only rewinds Now (no waiter fires on a rewind).
+// AfterFunc callbacks are invoked synchronously after the lock is released.
 func (c *FakeClock) Set(t time.Time) {
 	c.mu.Lock()
-	defer c.mu.Unlock()
 	c.now = t
-	c.fireDueLocked()
+	c.fireDueLocked() // releases and re-acquires mu around AfterFunc callbacks
+	c.mu.Unlock()
 }
 
 // fireDueLocked fires all unstopped waiters at/before c.now in deadline order;
 // caller MUST hold c.mu.
+//
+// Channel-based waiters (Timer/Sleep) are fired under the lock (buffered send,
+// non-blocking). AfterFunc waiters are marked fired under the lock, then their
+// fn() is called synchronously in deadline order AFTER releasing the lock. This
+// prevents re-entrance deadlocks if a callback calls back into the clock (e.g.
+// schedules another timer). Newly scheduled timers fire on a subsequent Advance
+// (snapshot semantics — we do not loop to catch them in the same pass).
 func (c *FakeClock) fireDueLocked() {
 	var due, rest []*fakeWaiter
 	for _, w := range c.waiters {
@@ -156,9 +177,23 @@ func (c *FakeClock) fireDueLocked() {
 	}
 	c.waiters = rest
 	sort.SliceStable(due, func(i, j int) bool { return due[i].deadline.Before(due[j].deadline) })
+
+	// Collect AfterFunc callbacks to invoke after releasing the lock.
+	var callbacks []func()
 	for _, w := range due {
-		c.fire(w)
+		c.fire(w) // marks w.fired; sends on channel for channel-based waiters
+		if w.fn != nil {
+			callbacks = append(callbacks, w.fn)
+		}
 	}
+
+	// Release the lock before calling any AfterFunc fn so that a callback that
+	// re-enters the clock (e.g. schedules a new timer) does not deadlock on mu.
+	c.mu.Unlock()
+	for _, fn := range callbacks {
+		fn() // synchronous, in deadline order — deterministic, not racy
+	}
+	c.mu.Lock()
 }
 
 // compile-time assertions.

@@ -2,7 +2,6 @@ package clock
 
 import (
 	"context"
-	"sync"
 	"testing"
 	"time"
 )
@@ -256,22 +255,15 @@ func TestFakeSetAdvancesAndFires(t *testing.T) {
 func TestFakeFiresInDeadlineOrder(t *testing.T) {
 	c := NewFake(fakeBase)
 	var order []int
-	var mu sync.Mutex
 	record := func(n int) func() {
-		return func() {
-			mu.Lock()
-			order = append(order, n)
-			mu.Unlock()
-		}
+		return func() { order = append(order, n) }
 	}
 	c.AfterFunc(3*time.Second, record(3))
 	c.AfterFunc(1*time.Second, record(1))
 	c.AfterFunc(2*time.Second, record(2))
+	// Callbacks are synchronous in deadline order; order is populated before
+	// Advance returns — no sleep or mutex needed.
 	c.Advance(5 * time.Second)
-	// AfterFunc callbacks run in their own goroutines; wait briefly for them.
-	time.Sleep(50 * time.Millisecond)
-	mu.Lock()
-	defer mu.Unlock()
 	if len(order) != 3 || order[0] != 1 || order[1] != 2 || order[2] != 3 {
 		t.Fatalf("callbacks fired out of deadline order: %v", order)
 	}
