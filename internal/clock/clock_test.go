@@ -142,9 +142,10 @@ func TestFakeAfterFuncRunsOnAdvance(t *testing.T) {
 	done := make(chan struct{})
 	c.AfterFunc(2*time.Second, func() { close(done) })
 	c.Advance(2 * time.Second)
+	// Callbacks are synchronous; done is already closed when Advance returns.
 	select {
 	case <-done:
-	case <-time.After(time.Second):
+	default:
 		t.Fatal("AfterFunc callback not invoked on Advance")
 	}
 }
@@ -266,5 +267,45 @@ func TestFakeFiresInDeadlineOrder(t *testing.T) {
 	c.Advance(5 * time.Second)
 	if len(order) != 3 || order[0] != 1 || order[1] != 2 || order[2] != 3 {
 		t.Fatalf("callbacks fired out of deadline order: %v", order)
+	}
+}
+
+// TestFakeCallbackPanicDoesNotCorruptClock proves that a panicking AfterFunc
+// callback does not corrupt the clock's mutex. Without the defer-relock fix in
+// fireDue, the panic would escape with mu unlocked; the outer defer c.mu.Unlock()
+// in Advance would then double-unlock (panic) or leave subsequent calls hanging.
+func TestFakeCallbackPanicDoesNotCorruptClock(t *testing.T) {
+	c := NewFake(fakeBase)
+
+	// Register a callback that panics.
+	c.AfterFunc(1*time.Second, func() { panic("intentional test panic") })
+
+	// Advance with the panic recovered — simulates a caller that protects itself.
+	func() {
+		defer func() { recover() }() //nolint:errcheck
+		c.Advance(1 * time.Second)
+	}()
+
+	// The clock must still be usable after the recovered panic.
+	// c.Now() must not hang (would hang if mu is left unlocked/double-unlocked).
+	want := fakeBase.Add(1 * time.Second)
+	if got := c.Now(); !got.Equal(want) {
+		t.Fatalf("Now()=%v want %v after recovered panic", got, want)
+	}
+
+	// A second AfterFunc registered and fired after the panic must work normally.
+	fired := make(chan struct{})
+	c.AfterFunc(1*time.Second, func() { close(fired) })
+	c.Advance(1 * time.Second)
+	select {
+	case <-fired:
+	default:
+		t.Fatal("second AfterFunc did not fire after recovered panic in first callback")
+	}
+
+	// Final Now check — clock must reflect both advances.
+	want2 := fakeBase.Add(2 * time.Second)
+	if got := c.Now(); !got.Equal(want2) {
+		t.Fatalf("Now()=%v want %v after second Advance", got, want2)
 	}
 }

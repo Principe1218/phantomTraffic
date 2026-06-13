@@ -62,7 +62,7 @@ func (c *FakeClock) addWaiter(d time.Duration, fn func()) (*fakeWaiter, func()) 
 
 // fire delivers the waiter exactly once; caller MUST hold c.mu.
 // Channel-based waiters (Timer/Sleep) receive on their buffered channel.
-// AfterFunc waiters are NOT called here — fireDueLocked collects them and
+// AfterFunc waiters are NOT called here — fireDue collects them and
 // calls fn() after releasing the lock to avoid re-entrance deadlocks.
 func (c *FakeClock) fire(w *fakeWaiter) {
 	if w.fired || w.stopped {
@@ -72,7 +72,7 @@ func (c *FakeClock) fire(w *fakeWaiter) {
 	if w.fn == nil {
 		w.ch <- w.deadline
 	}
-	// fn != nil: caller (fireDueLocked) is responsible for invoking fn().
+	// fn != nil: caller (fireDue) is responsible for invoking fn().
 }
 
 // fakeTimer adapts a waiter to the Timer interface.
@@ -100,6 +100,10 @@ func (c *FakeClock) NewTimer(d time.Duration) Timer {
 	return &fakeTimer{c: c, w: w}
 }
 
+// AfterFunc schedules f to run after duration d. A callback registered via
+// AfterFunc may call back into the clock (e.g. schedule a new timer); the new
+// timer fires on a SUBSEQUENT Advance, not within the current one (snapshot
+// semantics).
 func (c *FakeClock) AfterFunc(d time.Duration, f func()) Timer {
 	c.mu.Lock()
 	w, immediate := c.addWaiter(d, f)
@@ -137,11 +141,14 @@ func (c *FakeClock) Sleep(ctx context.Context, d time.Duration) error {
 // Advance moves logical time forward by d and fires every waiter whose deadline
 // is now at or before the new time, in ascending deadline order.
 // AfterFunc callbacks are invoked synchronously after the lock is released.
+// A callback registered via AfterFunc may call back into the clock (e.g. schedule
+// a new timer); the new timer fires on a SUBSEQUENT Advance, not within the
+// current one (snapshot semantics).
 func (c *FakeClock) Advance(d time.Duration) {
 	c.mu.Lock()
+	defer c.mu.Unlock()
 	c.now = c.now.Add(d)
-	c.fireDueLocked() // releases and re-acquires mu around AfterFunc callbacks
-	c.mu.Unlock()
+	c.fireDue() // releases and re-acquires mu around AfterFunc callbacks
 }
 
 // Set moves logical time to t. If t is in the future it fires due waiters in
@@ -149,13 +156,14 @@ func (c *FakeClock) Advance(d time.Duration) {
 // AfterFunc callbacks are invoked synchronously after the lock is released.
 func (c *FakeClock) Set(t time.Time) {
 	c.mu.Lock()
+	defer c.mu.Unlock()
 	c.now = t
-	c.fireDueLocked() // releases and re-acquires mu around AfterFunc callbacks
-	c.mu.Unlock()
+	c.fireDue() // releases and re-acquires mu around AfterFunc callbacks
 }
 
-// fireDueLocked fires all unstopped waiters at/before c.now in deadline order;
-// caller MUST hold c.mu.
+// fireDue fires all unstopped waiters at/before c.now in deadline order;
+// caller must hold c.mu on entry; this releases and re-acquires c.mu around
+// AfterFunc callbacks and returns with c.mu held.
 //
 // Channel-based waiters (Timer/Sleep) are fired under the lock (buffered send,
 // non-blocking). AfterFunc waiters are marked fired under the lock, then their
@@ -163,7 +171,7 @@ func (c *FakeClock) Set(t time.Time) {
 // prevents re-entrance deadlocks if a callback calls back into the clock (e.g.
 // schedules another timer). Newly scheduled timers fire on a subsequent Advance
 // (snapshot semantics — we do not loop to catch them in the same pass).
-func (c *FakeClock) fireDueLocked() {
+func (c *FakeClock) fireDue() {
 	var due, rest []*fakeWaiter
 	for _, w := range c.waiters {
 		if w.stopped {
@@ -187,13 +195,18 @@ func (c *FakeClock) fireDueLocked() {
 		}
 	}
 
+	if len(callbacks) == 0 {
+		return
+	}
+
 	// Release the lock before calling any AfterFunc fn so that a callback that
 	// re-enters the clock (e.g. schedules a new timer) does not deadlock on mu.
+	// defer guarantees the relock happens on ALL exit paths, including panic.
 	c.mu.Unlock()
+	defer c.mu.Lock()
 	for _, fn := range callbacks {
 		fn() // synchronous, in deadline order — deterministic, not racy
 	}
-	c.mu.Lock()
 }
 
 // compile-time assertions.
