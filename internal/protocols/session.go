@@ -37,11 +37,11 @@ type SessionDeps struct {
 	Rand      rng.Rand     // non-crypto shaping RNG (§7)
 	Log       *slog.Logger // pre-tagged with session/request id; never passed secrets
 	Stats     StatsRecorder
-	Caps      safety.Caps             // effective (merged, most-restrictive) caps for this session
-	Audit     audit.Sink              // append-only local audit log for security-relevant events (§7)
+	Caps      safety.Caps               // effective (merged, most-restrictive) caps for this session
+	Audit     audit.Sink                // append-only local audit log for security-relevant events (§7)
 	CredSrc   secret.CredentialResolver // resolves CredentialRef -> key bytes LAZILY, inside handler only
-	Shared    SharedState             // process-wide caches the realism needs
-	Transport TransportProbe          // injectable byte/throughput source — REAL in prod, scripted in tests (§8)
+	Shared    SharedState               // process-wide caches the realism needs
+	Transport TransportProbe            // injectable byte/throughput source — REAL in prod, scripted in tests (§8)
 }
 
 // SharedState is the ONE acknowledged concurrent-shared-mutable region in the

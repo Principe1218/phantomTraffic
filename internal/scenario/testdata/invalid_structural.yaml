@@ -1,0 +1,15 @@
+name: ""
+execution:
+  mode: "parallel"
+scenarios:
+  - id: "dup"
+    protocol: "http"
+    targets:
+      - "a.example.com"
+  - id: "dup"
+    protocol: "htttp"
+    targets:
+      - "b.example.com"
+  - id: "empty-targets"
+    protocol: "dns"
+    targets: []

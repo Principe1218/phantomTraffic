@@ -1,0 +1,38 @@
+name: "company baseline"
+description: "a fully valid scenario covering all four protocols"
+allowed_domains:
+  - "cdn.company.com"
+caps:
+  per_target_rps: 5
+  global_rps: 25
+  max_concurrent_sessions: 10
+  total_request_budget: 500000
+  streaming_byte_rate_kbps: 8000
+  concurrent_streams: 2
+  per_session_max_duration_seconds: 600
+  per_session_max_actions: 5000
+execution:
+  mode: "sequential"
+  stop_on_error: true
+scenarios:
+  - id: "web"
+    protocol: "http"
+    targets:
+      - "web.company.com"
+      - "api.company.com:8443"
+    target_rotation: "sequential"
+    target_rotation_interval_seconds: 300
+  - id: "resolve"
+    protocol: "dns"
+    targets:
+      - "ns1.company.com:53"
+    target_rotation: "random"
+    target_rotation_interval_seconds: 0
+  - id: "shell"
+    protocol: "ssh"
+    targets:
+      - "bastion.company.com:22"
+  - id: "video"
+    protocol: "stream"
+    targets:
+      - "media.company.com"

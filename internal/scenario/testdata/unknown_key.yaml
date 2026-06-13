@@ -1,0 +1,9 @@
+name: typo-scenario
+allowed_domains:
+  - example.com
+scenarios:
+  - id: web-browse
+    protocol: http
+    targets:
+      - example.com:443
+    not_a_real_key: true
