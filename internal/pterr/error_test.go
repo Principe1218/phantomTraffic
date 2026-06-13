@@ -126,9 +126,10 @@ func TestClassifyAndIsClass(t *testing.T) {
 	}
 }
 
-// errorsJoin wraps inner so it is reachable via the Unwrap tree (errors.Join semantics).
-func errorsJoin(_ error, inner error) error {
-	return errors.Join(inner)
+// errorsJoin builds a genuine 2-element joined error so errors.As/Is must traverse
+// a real multi-error Unwrap tree (errors.Join's Unwrap() []error form) to reach inner.
+func errorsJoin(outer error, inner error) error {
+	return errors.Join(outer, inner)
 }
 
 func TestLogValueNeverLeaksCauseThroughSlog(t *testing.T) {

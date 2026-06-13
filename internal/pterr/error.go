@@ -14,11 +14,11 @@ import (
 //   - Code       stable, low-cardinality code (e.g. "http.5xx", "dns.servfail").
 //   - Op         the logical operation that failed (e.g. "ssh.connect").
 //   - Msg        BORN REDACTED: safe for logs and the UI; must contain no
-//                secrets, headers, bodies, or stack text (AGENTS.md §3.1, §5.5).
+//     secrets, headers, bodies, or stack text (AGENTS.md §3.1, §5.5).
 //   - cause      the wrapped original error. SERVER-SIDE ONLY: reachable via
-//                Unwrap / errors.Is / errors.As, but NEVER rendered by Error()
-//                or LogValue(), so its (possibly sensitive) text cannot reach a
-//                log line or the UI.
+//     Unwrap / errors.Is / errors.As, but NEVER rendered by Error()
+//     or LogValue(), so its (possibly sensitive) text cannot reach a
+//     log line or the UI.
 //   - retryable  whether the engine should retry; defaults from Class.
 type Error struct {
 	Class     Class

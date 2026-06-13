@@ -1,10 +1,3 @@
-// Package pterr defines PhantomTraffic's closed error taxonomy and a
-// redaction-preserving error envelope. Handlers map their long tail of concrete
-// failures onto this 4+1 class set at the handler boundary so the engine and
-// behavior layer branch on a fixed number of cases (design §6).
-//
-// The package is intentionally dependency-free (stdlib only): it is the leaf
-// every other internal package may import without creating cycles.
 package pterr
 
 // Class is the coarse, non-revealing error bucket the engine reacts to.
