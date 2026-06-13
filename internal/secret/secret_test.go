@@ -131,6 +131,59 @@ func TestSecret_NilSafe(t *testing.T) {
 	s.Zero() // must not panic
 }
 
+// canary is a distinct sensitive value used by the by-value-copy regression test.
+const canary = "CANARY"
+
+// TestSecret_ByValueCopyNeverLeaks guards the value-receiver fix: a Secret copied
+// BY VALUE (sv := *New(...)) and a Secret stored as a by-VALUE struct field must
+// still redact under every fmt verb, slog, and json.Marshal. With pointer-receiver
+// redaction methods, a value copy would not satisfy Stringer/LogValuer/Marshaler
+// and would leak its bytes (AGENTS.md §3.1).
+func TestSecret_ByValueCopyNeverLeaks(t *testing.T) {
+	sv := *secret.New([]byte(canary)) // by-value copy of a *Secret
+
+	// By-value struct field (not a pointer) — the silent value-JSON / value-fmt path.
+	type wrapper struct {
+		Name string        `json:"name"`
+		Sec  secret.Secret `json:"sec"`
+	}
+	w := wrapper{Name: "alice", Sec: *secret.New([]byte(canary))}
+
+	// fmt verbs over both the bare value copy and the by-value struct field.
+	formats := []string{"%s", "%q", "%v", "%+v", "%#v"}
+	for _, f := range formats {
+		for _, arg := range []any{sv, w} {
+			got := fmt.Sprintf(f, arg)
+			if strings.Contains(got, canary) {
+				t.Fatalf("format %q over %T leaked the canary: %q", f, arg, got)
+			}
+		}
+		// The bare value copy must specifically render the placeholder.
+		if got := fmt.Sprintf(f, sv); !strings.Contains(got, secret.Redacted) {
+			t.Fatalf("format %q over value copy did not render %q; got %q", f, secret.Redacted, got)
+		}
+	}
+
+	// slog with the Secret as a by-VALUE struct field.
+	var buf bytes.Buffer
+	logger := slog.New(slog.NewJSONHandler(&buf, nil))
+	logger.Info("value-field log", slog.Any("wrapper", w), slog.Any("copy", sv))
+	if out := buf.String(); strings.Contains(out, canary) {
+		t.Fatalf("slog leaked the canary via value field: %s", out)
+	}
+
+	// json.Marshal with the Secret as a by-VALUE struct field.
+	out, err := json.Marshal(w)
+	if err != nil {
+		t.Fatalf("json.Marshal returned error: %v", err)
+	}
+	if got := string(out); strings.Contains(got, canary) {
+		t.Fatalf("json.Marshal leaked the canary via value field: %s", got)
+	} else if !strings.Contains(got, secret.Redacted) {
+		t.Fatalf("json.Marshal value field did not emit %q; got %s", secret.Redacted, got)
+	}
+}
+
 // sprintf is a tiny indirection so the table can hold format strings.
 func sprintf(format string, args ...any) string {
 	return strings.TrimSpace(fmt.Sprintf(format, args...))

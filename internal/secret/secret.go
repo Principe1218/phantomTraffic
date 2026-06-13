@@ -59,18 +59,26 @@ func (s *Secret) Zero() {
 	s.b = nil
 }
 
+// The four redaction methods below take VALUE receivers deliberately. A value
+// receiver method is in BOTH the value and pointer method sets, so even a Secret
+// copied by value (sv := *s, or a by-value struct field) still satisfies
+// fmt.Stringer / fmt.GoStringer / slog.LogValuer / json.Marshaler and redacts.
+// A pointer receiver here would let a value copy silently leak its bytes under
+// %s/%q and value-JSON (AGENTS.md §3.1). Mutating/exposing methods (Expose, Len,
+// Zero) keep pointer receivers — Zero must mutate the single backing copy.
+
 // String implements fmt.Stringer so %v and %s render the placeholder.
-func (s *Secret) String() string { return Redacted }
+func (s Secret) String() string { return Redacted }
 
 // GoString implements fmt.GoStringer so %#v renders the placeholder.
-func (s *Secret) GoString() string { return Redacted }
+func (s Secret) GoString() string { return Redacted }
 
 // LogValue implements slog.LogValuer so slog ALWAYS records the placeholder,
 // even when a Secret is embedded in a logged struct (slog.Any walks LogValuer).
-func (s *Secret) LogValue() slog.Value { return slog.StringValue(Redacted) }
+func (s Secret) LogValue() slog.Value { return slog.StringValue(Redacted) }
 
 // MarshalJSON implements json.Marshaler so a Secret serialized to JSON (e.g. a
 // config dump streamed to the UI) emits the placeholder string, never bytes.
-func (s *Secret) MarshalJSON() ([]byte, error) {
+func (s Secret) MarshalJSON() ([]byte, error) {
 	return json.Marshal(Redacted)
 }

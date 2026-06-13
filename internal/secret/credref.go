@@ -49,8 +49,9 @@ func (k RefKind) String() string {
 
 // CredentialRef is an OPAQUE handle naming a credential. It carries NO secret
 // bytes — only a non-secret Kind + ID label — so it is safe to store on a
-// Target, serialize to YAML, and stream to the UI. Secret material is resolved
-// lazily, inside a protocol handler, via CredentialSource.Resolve.
+// Target and stream to the UI. (There is no MarshalYAML method yet, so YAML
+// serialization is not specially guaranteed by this type.) Secret material is
+// resolved lazily, inside a protocol handler, via CredentialSource.Resolve.
 type CredentialRef struct {
 	kind RefKind
 	id   string
