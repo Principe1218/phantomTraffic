@@ -18,7 +18,7 @@ func TestObservation_ByValueNoHandlerPointers(t *testing.T) {
 func assertNoReferenceFields(t *testing.T, typ reflect.Type, path string) {
 	t.Helper()
 	switch typ.Kind() {
-	case reflect.Ptr, reflect.Chan, reflect.Func, reflect.Map, reflect.UnsafePointer, reflect.Interface:
+	case reflect.Pointer, reflect.Chan, reflect.Func, reflect.Map, reflect.UnsafePointer, reflect.Interface:
 		t.Errorf("%s has reference kind %s — Observation must contain no aliasing into handler memory", path, typ.Kind())
 		return
 	case reflect.Slice, reflect.Array:

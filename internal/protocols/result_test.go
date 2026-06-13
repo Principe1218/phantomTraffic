@@ -64,7 +64,7 @@ func TestResult_NoSecretFields(t *testing.T) {
 
 func walkFieldNames(t *testing.T, typ reflect.Type, banned []string, path string) {
 	t.Helper()
-	for typ.Kind() == reflect.Ptr {
+	for typ.Kind() == reflect.Pointer {
 		typ = typ.Elem()
 	}
 	if typ.Kind() != reflect.Struct {
@@ -79,7 +79,7 @@ func walkFieldNames(t *testing.T, typ reflect.Type, banned []string, path string
 			}
 		}
 		ft := f.Type
-		for ft.Kind() == reflect.Ptr {
+		for ft.Kind() == reflect.Pointer {
 			ft = ft.Elem()
 		}
 		if ft.Kind() == reflect.Struct && ft.PkgPath() == typ.PkgPath() {
