@@ -1,0 +1,11 @@
+# .semgrepignore — Semgrep path exclusions for PhantomTraffic
+#
+# internal/rng and internal/behavior are the TWO PERMITTED boundaries for
+# math/rand/v2 (non-cryptographic traffic shaping only). The depguard rule in
+# .golangci.yml explicitly exempts these paths. Excluding them here prevents the
+# CWE-338 Semgrep rule from firing false positives on the intentional, reviewed
+# boundary. All other packages remain subject to the rule.
+#
+# See .golangci.yml depguard.rules.no-math-rand and AGENTS.md §2.
+internal/rng/
+internal/behavior/
