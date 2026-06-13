@@ -8,6 +8,10 @@
 *.so
 *.dylib
 
+# Compiled CLI binary from `go build ./cmd/phantom` in the repo root
+# (anchored so it never matches the cmd/phantom/ source directory)
+/phantom
+
 # Test binary, built with `go test -c`
 *.test
 
