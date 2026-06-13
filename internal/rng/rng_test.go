@@ -34,6 +34,34 @@ func TestNew_DifferentSeed_DifferentSequence(t *testing.T) {
 	}
 }
 
+// assertDraw validates that draw i produces identical output from got and want.
+// The method is chosen by i%5, cycling through all five delegated draw types.
+func assertDraw(t *testing.T, i int, got Rand, want *rand.Rand) {
+	t.Helper()
+	switch i % 5 {
+	case 0:
+		if g, w := got.Float64(), want.Float64(); g != w {
+			t.Fatalf("Float64 draw %d not delegated: %v != %v", i, g, w)
+		}
+	case 1:
+		if g, w := got.NormFloat64(), want.NormFloat64(); g != w {
+			t.Fatalf("NormFloat64 draw %d not delegated to stdlib Ziggurat: %v != %v", i, g, w)
+		}
+	case 2:
+		if g, w := got.ExpFloat64(), want.ExpFloat64(); g != w {
+			t.Fatalf("ExpFloat64 draw %d not delegated to stdlib Ziggurat: %v != %v", i, g, w)
+		}
+	case 3:
+		if g, w := got.IntN(1000), want.IntN(1000); g != w {
+			t.Fatalf("IntN draw %d not delegated: %v != %v", i, g, w)
+		}
+	case 4:
+		if g, w := got.Int63n(1<<40), want.Int64N(1<<40); g != w {
+			t.Fatalf("Int63n draw %d not delegated to Int64N: %v != %v", i, g, w)
+		}
+	}
+}
+
 func TestProdRand_DelegatesToStdlibZiggurat(t *testing.T) {
 	const seed1, seed2 uint64 = 0xDEADBEEF, 0x1234567890ABCDEF
 
@@ -48,28 +76,7 @@ func TestProdRand_DelegatesToStdlibZiggurat(t *testing.T) {
 	// since both share one underlying PCG stream. Any reimplementation of the
 	// Ziggurat (e.g. a hand-rolled Box-Muller) would diverge here.
 	for i := 0; i < 32; i++ {
-		switch i % 5 {
-		case 0:
-			if g, w := got.Float64(), want.Float64(); g != w {
-				t.Fatalf("Float64 draw %d not delegated: %v != %v", i, g, w)
-			}
-		case 1:
-			if g, w := got.NormFloat64(), want.NormFloat64(); g != w {
-				t.Fatalf("NormFloat64 draw %d not delegated to stdlib Ziggurat: %v != %v", i, g, w)
-			}
-		case 2:
-			if g, w := got.ExpFloat64(), want.ExpFloat64(); g != w {
-				t.Fatalf("ExpFloat64 draw %d not delegated to stdlib Ziggurat: %v != %v", i, g, w)
-			}
-		case 3:
-			if g, w := got.IntN(1000), want.IntN(1000); g != w {
-				t.Fatalf("IntN draw %d not delegated: %v != %v", i, g, w)
-			}
-		case 4:
-			if g, w := got.Int63n(1<<40), want.Int64N(1<<40); g != w {
-				t.Fatalf("Int63n draw %d not delegated to Int64N: %v != %v", i, g, w)
-			}
-		}
+		assertDraw(t, i, got, want)
 	}
 }
 
