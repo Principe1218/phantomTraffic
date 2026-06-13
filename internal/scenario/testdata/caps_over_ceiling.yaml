@@ -1,0 +1,8 @@
+name: "caps over ceiling"
+caps:
+  per_target_rps: 11
+scenarios:
+  - id: "web"
+    protocol: "http"
+    targets:
+      - "host.example.com"
