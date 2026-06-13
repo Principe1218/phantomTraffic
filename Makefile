@@ -3,8 +3,8 @@
 
 GO              ?= go
 GOLANGCI_LINT   ?= github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v2.12.2
-STATICCHECK     ?= honnef.co/go/tools/cmd/staticcheck@2025.1.1
-GOSEC           ?= github.com/securego/gosec/v2/cmd/gosec@v2.21.4
+STATICCHECK     ?= honnef.co/go/tools/cmd/staticcheck@2026.1
+GOSEC           ?= github.com/securego/gosec/v2/cmd/gosec@v2.27.1
 GOVULNCHECK     ?= golang.org/x/vuln/cmd/govulncheck@v1.3.0
 
 .PHONY: all build test lint vuln vet staticcheck gosec golangci tidy-check
