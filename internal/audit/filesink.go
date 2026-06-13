@@ -69,7 +69,7 @@ func NewFileSink(path string, clk clock.Clock, agentID string) (*FileSink, error
 	if err != nil {
 		return nil, err
 	}
-	f, err := os.OpenFile(path, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0o600) // #nosec G304 — path is a caller-supplied log file path, not user input
+	f, err := os.OpenFile(path, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0o600) // #nosec G304 G703 — path is an operator-supplied log file path, not untrusted/tainted input
 	if err != nil {
 		return nil, fmt.Errorf("audit: open %s: %w", path, err)
 	}
@@ -85,7 +85,7 @@ func NewFileSink(path string, clk clock.Clock, agentID string) (*FileSink, error
 // replay scans an existing file, verifies the chain, and returns the next seq and
 // the tail hash. A missing file is treated as an empty chain (genesis next).
 func replay(path string) (nextSeq uint64, tailHash string, err error) {
-	f, openErr := os.Open(path) // #nosec G304 — path is the audit log file, not user-controlled input
+	f, openErr := os.Open(path) // #nosec G304 G703 — path is the operator-supplied audit log file, not untrusted/tainted input
 	if openErr != nil {
 		if os.IsNotExist(openErr) {
 			return 0, genesisHash, nil
