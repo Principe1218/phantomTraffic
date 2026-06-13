@@ -45,3 +45,12 @@ func IsKnownProtocol(p ProtocolID) bool {
 	_, ok := knownProtocols[p]
 	return ok
 }
+
+// KnownProtocols returns the four supported protocols in a stable sorted order
+// (dns, http, ssh, stream). It allocates a fresh slice on every call so that a
+// caller mutating the result cannot affect package state or any other caller;
+// the order is fixed (not derived from map iteration) so output is
+// deterministic for tests, logs, and help text.
+func KnownProtocols() []ProtocolID {
+	return []ProtocolID{ProtoDNS, ProtoHTTP, ProtoSSH, ProtoStream}
+}

@@ -30,3 +30,34 @@ func TestIsKnownProtocol(t *testing.T) {
 		})
 	}
 }
+
+func TestKnownProtocols_StableSortedOrder(t *testing.T) {
+	want := []ProtocolID{ProtoDNS, ProtoHTTP, ProtoSSH, ProtoStream}
+	got := KnownProtocols()
+	if len(got) != len(want) {
+		t.Fatalf("KnownProtocols() len = %d, want %d (%v)", len(got), len(want), got)
+	}
+	for i := range want {
+		if got[i] != want[i] {
+			t.Errorf("KnownProtocols()[%d] = %q, want %q", i, got[i], want[i])
+		}
+	}
+}
+
+func TestKnownProtocols_AllocationIndependence(t *testing.T) {
+	first := KnownProtocols()
+	// Mutate the returned slice; this must not leak into the package state.
+	for i := range first {
+		first[i] = ProtocolID("tampered")
+	}
+	second := KnownProtocols()
+	want := []ProtocolID{ProtoDNS, ProtoHTTP, ProtoSSH, ProtoStream}
+	if len(second) != len(want) {
+		t.Fatalf("second call len = %d, want %d (%v)", len(second), len(want), second)
+	}
+	for i := range want {
+		if second[i] != want[i] {
+			t.Errorf("after mutating first call, KnownProtocols()[%d] = %q, want %q", i, second[i], want[i])
+		}
+	}
+}
