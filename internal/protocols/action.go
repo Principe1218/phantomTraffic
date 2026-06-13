@@ -84,9 +84,16 @@ func (b BaseAction) Pacing() PacingMode   { return b.P }
 // an unrecognized Action is a routing failure, not a compile break, which
 // keeps "extensible = add a package, register a handler" true.
 func As[T Action](a Action) (T, error) {
+	var zero T
+	// Guard the nil interface: a nil Action reaching a cast site is an engine bug,
+	// but As is the single audited downcast and its "never panics" contract is
+	// absolute — without this, the mismatch branch's a.Kind()/a.Protocol() calls
+	// would nil-dereference and surface as an OutcomePanicked deep in a handler.
+	if a == nil {
+		return zero, &RoutingError{Msg: "nil action presented to handler"}
+	}
 	t, ok := a.(T)
 	if !ok {
-		var zero T
 		return zero, &RoutingError{Got: a.Kind(), Proto: a.Protocol(), Msg: "action concrete type does not match handler"}
 	}
 	return t, nil

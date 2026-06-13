@@ -66,6 +66,22 @@ func TestAs_WrongType_ReturnsRoutingError(t *testing.T) {
 	}
 }
 
+func TestAs_NilAction_ReturnsRoutingErrorWithoutPanic(t *testing.T) {
+	// A nil Action reaching the audited cast site must NOT panic (the "never
+	// panics" contract is absolute); it returns a *RoutingError instead.
+	var a Action // nil interface
+	got, err := As[fakeReqAction](a)
+	if err == nil {
+		t.Fatal("As(nil) must return an error, not the zero value with nil err")
+	}
+	if _, ok := err.(*RoutingError); !ok {
+		t.Fatalf("As(nil) must return *RoutingError, got %T", err)
+	}
+	if got != (fakeReqAction{}) {
+		t.Fatalf("As(nil) must return the zero T, got %+v", got)
+	}
+}
+
 func TestCause_String(t *testing.T) {
 	cases := map[Cause]string{
 		CauseNavigation:  "navigation",
