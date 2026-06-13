@@ -38,6 +38,10 @@ func Load(path string) (Raw, error) {
 		)
 	}
 
+	// #nosec G304 -- the scenario path is supplied by the operator invoking the CLI,
+	// who already has OS-level access to it (no privilege boundary is crossed); the
+	// read is additionally size-capped above by maxFileBytes. A future plan that loads
+	// scenarios over a network/RPC surface must add path canonicalization before this.
 	f, err := os.Open(path)
 	if err != nil {
 		// A file that vanished between Stat and Open: surface unmasked too.
