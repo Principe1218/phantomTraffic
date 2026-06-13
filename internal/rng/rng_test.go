@@ -41,6 +41,7 @@ func TestProdRand_DelegatesToStdlibZiggurat(t *testing.T) {
 	got := New(seed1, seed2)
 
 	// an independently-constructed stdlib generator with the IDENTICAL seed
+	// #nosec G404 -- non-cryptographic; this is the reference generator the delegation test compares against.
 	want := rand.New(rand.NewPCG(seed1, seed2))
 
 	// The draw ORDER below must exactly mirror the order we pull from `want`,

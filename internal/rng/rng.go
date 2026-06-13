@@ -37,6 +37,8 @@ type prodRand struct {
 // backed by a math/rand/v2 PCG generator. Equal (seed1, seed2) pairs yield equal
 // sequences, which is the foundation of single-agent run replay (design §4).
 func New(seed1, seed2 uint64) Rand {
+	// #nosec G404 -- intentional non-cryptographic shaping RNG (the reviewed math/rand
+	// boundary). Security-sensitive randomness uses crypto/rand via internal/idgen.
 	return &prodRand{r: rand.New(rand.NewPCG(seed1, seed2))}
 }
 
@@ -67,5 +69,7 @@ func (p *prodRand) Perm(n int) []int { return p.r.Perm(n) }
 func (p *prodRand) Split() Rand {
 	s1 := p.r.Uint64()
 	s2 := p.r.Uint64()
+	// #nosec G404 -- intentional non-cryptographic shaping RNG (the reviewed math/rand
+	// boundary). Security-sensitive randomness uses crypto/rand via internal/idgen.
 	return &prodRand{r: rand.New(rand.NewPCG(s1, s2))}
 }
