@@ -220,9 +220,8 @@ govulncheck ./...
 Output (fill from command output):
 
 ```text
-> govulncheck invocation blocked by auto-mode safety classifier during Module 4 execution.
-> OSV.dev API confirms no known vulnerabilities for go.yaml.in/yaml/v3@v3.0.4 (result: {}).
-> Run `govulncheck ./...` manually from the repo root to produce and paste the output here.
+$ make vuln   # go run golang.org/x/vuln/cmd/govulncheck@v1.3.0 ./...
+No vulnerabilities found.
 ```
 
 Cross-reference the Go vulnerability database / GitHub Advisory Database for
@@ -244,12 +243,11 @@ Output (fill from command output):
 > Note: the OSV.dev query returned `{}` (empty object) — no known vulnerabilities
 > for `go.yaml.in/yaml/v3` at `v3.0.4`. The predecessor module `gopkg.in/yaml.v3`
 > had CVE-2022-28948 (DoS via crafted input) but that was patched in v3.0.0;
-> `v3.0.4` is unaffected. `govulncheck` output is PENDING until Module 4 adds the
-> import (see Module 1 CORRECTION).
+> `v3.0.4` is unaffected. `govulncheck ./...` (golang.org/x/vuln v1.3.0) was run
+> via `make vuln` after Module 4 added the import and reported **No vulnerabilities found.**
 
-- **Known CVEs / advisories affecting v3.0.4:** None found via OSV.dev query
-  (result: `{}`). `govulncheck` invocation was blocked by the auto-mode safety
-  classifier during Module 4 execution — requires manual run.
+- **Known CVEs / advisories affecting v3.0.4:** None. OSV.dev query returned `{}`,
+  and `govulncheck ./...` (v1.3.0, via `make vuln`) reported "No vulnerabilities found."
 
 ## 8. §7.1 sign-off checklist
 
@@ -265,9 +263,8 @@ Output (fill from command output):
       dep (`gopkg.in/check.v1` — yaml library's own test framework, not a
       production transitive; zero third-party production transitives).
 - [x] (6) De-facto status recorded — ecosystem-standard YAML library.
-- [ ] Vulnerability scan recorded — OSV.dev clean (`{}`); `govulncheck ./...` was
-      blocked by auto-mode safety classifier during Module 4 execution; must be
-      run manually and output pasted here before final sign-off.
+- [x] Vulnerability scan recorded — OSV.dev clean (`{}`) and `govulncheck ./...`
+      (v1.3.0, via `make vuln`) reports "No vulnerabilities found."
 
 Developer approval (AGENTS.md §7.1 requires explicit approval): the existence of
 this committed dossier with all verification outputs pasted constitutes the
