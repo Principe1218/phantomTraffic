@@ -29,7 +29,7 @@ func dispatch(args []string, stdout, stderr io.Writer) int {
 		return runValidate(args[1:], stdout, stderr)
 	default:
 		// Unknown subcommand is an operator/usage error: usage to stderr, code 2.
-		_, _ = io.WriteString(stderr, "phantom: unknown subcommand "+strconv.Quote(args[0])+"\n")
+		_, _ = io.WriteString(stderr, "phantom: unknown subcommand "+strconv.Quote(args[0])+"\n") // #nosec G705 -- stderr is a CLI stream, not an HTML sink; XSS is inapplicable (arg also control-char-escaped via strconv.Quote)
 		usage(stderr)
 		return 2
 	}
