@@ -70,14 +70,14 @@ func TestLoadRejectsUnknownKey(t *testing.T) {
 		t.Fatalf("error Class = %v, want ClassConfig", pe.Class)
 	}
 
-	// The decoder's underlying message should mention the offending field so an
-	// operator can find the typo. yaml.v3 reports it as "field allow_insecure not found".
+	// The decoder's underlying message should name the offending key so an
+	// operator can find it. yaml.v3 reports it as "field not_a_real_key not found".
 	cause := pe.Unwrap()
 	if cause == nil {
 		t.Fatal("expected the *pterr.Error to wrap the decoder's cause")
 	}
-	if !strings.Contains(cause.Error(), "allow_insecure") {
-		t.Fatalf("wrapped cause = %q, want it to mention the unknown field allow_insecure", cause.Error())
+	if !strings.Contains(cause.Error(), "not_a_real_key") {
+		t.Fatalf("wrapped cause = %q, want it to mention the unknown field not_a_real_key", cause.Error())
 	}
 }
 

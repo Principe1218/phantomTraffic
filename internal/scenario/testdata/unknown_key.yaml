@@ -6,4 +6,4 @@ scenarios:
     protocol: http
     targets:
       - example.com:443
-    allow_insecure: true
+    not_a_real_key: true
