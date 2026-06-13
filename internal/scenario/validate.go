@@ -142,7 +142,7 @@ func validHost(host string) bool {
 	if host == "" {
 		return false
 	}
-	if ip := net.ParseIP(host); ip != nil {
+	if net.ParseIP(host) != nil {
 		return true
 	}
 	if len(host) > hostMaxLen {

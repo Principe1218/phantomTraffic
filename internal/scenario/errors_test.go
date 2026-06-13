@@ -50,7 +50,7 @@ func TestValidationErrorsError(t *testing.T) {
 		}
 	}
 	// All three messages must be joined into one string (3 distinct fragments).
-	if n := strings.Count(got, ": "); n < 3 {
+	if strings.Count(got, ": ") < 3 {
 		t.Fatalf("ValidationErrors.Error() = %q, want at least 3 joined field errors", got)
 	}
 }
