@@ -8,6 +8,7 @@ linters:
   enable:
     - depguard
     - forbidigo
+    - gosec
     - govet
     - ineffassign
     - staticcheck
@@ -32,6 +33,10 @@ linters:
           msg: 'inject clock.Clock and call Now(); time.Now is banned in internal/behavior for determinism'
         - pattern: '^time\.Sleep$'
           msg: 'the engine performs the sleep via clock.Clock; time.Sleep is banned in internal/behavior'
+        # Primary control: handlers/behavior receive an injected rng.Rand and must
+        # not call package-global rand functions. This pattern is a secondary lint
+        # reminder. Note: an aliased `math/rand/v2` import could evade this check,
+        # but depguard still confines that import to internal/rng and internal/behavior.
         - pattern: '^rand\.'
           msg: 'use the injected rng.Rand, not a package-global rand function, inside internal/behavior'
   exclusions:
