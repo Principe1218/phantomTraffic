@@ -149,6 +149,18 @@ func TestNewSessionRequiresSelectorAndDeps(t *testing.T) {
 	}
 }
 
+func TestNewSessionRequiresNonEmptyMix(t *testing.T) {
+	spec := SessionSpec{
+		// zero-value TemplateMix — Len() == 0
+		Selector: oneHTTPSelector(),
+	}
+	deps := protocols.SessionDeps{Clock: clock.NewFake(sessBase), Rand: rng.NewFake(rng.FakeScript{})}
+	_, err := NewSessionFactory().NewSession(context.Background(), spec, deps)
+	if err == nil {
+		t.Fatal("expected error when Mix is empty")
+	}
+}
+
 func TestSessionFingerprintAndBounds(t *testing.T) {
 	pool, err := DefaultFingerprintPool()
 	if err != nil {

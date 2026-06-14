@@ -76,6 +76,9 @@ type factory struct{}
 func NewSessionFactory() SessionFactory { return factory{} }
 
 func (factory) NewSession(_ context.Context, spec SessionSpec, deps protocols.SessionDeps) (Session, error) {
+	if spec.Mix.Len() == 0 {
+		return nil, fmt.Errorf("behavior: SessionSpec.Mix must be non-empty")
+	}
 	if spec.Selector == nil {
 		return nil, fmt.Errorf("behavior: SessionSpec.Selector is required")
 	}
