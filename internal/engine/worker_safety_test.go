@@ -64,7 +64,7 @@ func TestRunActionSafetyTripsTripwireAndStops(t *testing.T) {
 	}}
 	sess := newTestSession(clk, r)
 
-	done := runWorkerAsync(context.Background(), sess, vs, d, clk)
+	done := runWorkerAsync(context.Background(), sess, vs, d)
 	time.Sleep(20 * time.Millisecond)
 	clk.Advance(time.Second)
 

@@ -51,55 +51,88 @@ func (r *Run) ApplyPatch(_ context.Context, p ScenarioPatch) error {
 	detail := map[string]string{}
 
 	if p.Caps != nil {
-		next := r.caps.WithPatch(*p.Caps)
-		if capsRaised(r.caps, next) {
-			if !r.capOverride {
-				return pterr.New(pterr.ClassConfig, "engine.patch.caps_up",
-					applyPatchOp, "raising a safety cap requires the cap-override flag")
-			}
-			if err := r.audit.Append(audit.Event{
-				Actor:    r.AgentID(),
-				Action:   audit.ActionCapOverrideEnabled,
-				Resource: r.ID(),
-				Detail:   map[string]string{"run_id": r.ID()},
-			}); err != nil {
-				return err
-			}
-		}
-		r.caps = next
-		detail["caps"] = "patched"
-	}
-
-	if p.Concurrency != nil {
-		n := *p.Concurrency
-		if n <= 0 {
-			return pterr.New(pterr.ClassConfig, "engine.patch.concurrency",
-				applyPatchOp, "concurrency must be >= 1")
-		}
-		r.sem.setLimit(n)
-		detail["concurrency"] = strconv.Itoa(n)
-	}
-
-	if p.Weights != nil {
-		norm, err := r.normalizeWeights(*p.Weights)
-		if err != nil {
+		if err := r.patchCaps(*p.Caps, detail); err != nil {
 			return err
 		}
-		r.weights = norm
-		detail["weights"] = "patched"
 	}
-
-	if p.RotationIntSec != nil {
-		sec := *p.RotationIntSec
-		if sec < 0 {
-			return pterr.New(pterr.ClassConfig, "engine.patch.rotation",
-				applyPatchOp, "rotation interval seconds must be >= 0")
+	if p.Concurrency != nil {
+		if err := r.patchConcurrency(*p.Concurrency, detail); err != nil {
+			return err
 		}
-		r.selector.setInterval(time.Duration(sec) * time.Second)
-		detail["rotation_interval_sec"] = strconv.Itoa(sec)
+	}
+	if p.Weights != nil {
+		if err := r.patchWeights(*p.Weights, detail); err != nil {
+			return err
+		}
+	}
+	if p.RotationIntSec != nil {
+		if err := r.patchRotation(*p.RotationIntSec, detail); err != nil {
+			return err
+		}
+	}
+	if err := r.patchTargetsAdd(p.TargetsAdd, detail); err != nil {
+		return err
+	}
+	if err := r.patchTargetsDisable(p.TargetsDisable, detail); err != nil {
+		return err
 	}
 
-	for _, spec := range p.TargetsAdd {
+	return r.finishPatch(detail)
+}
+
+func (r *Run) patchCaps(cp safety.CapPatch, detail map[string]string) error {
+	next := r.caps.WithPatch(cp)
+	if capsRaised(r.caps, next) {
+		if !r.capOverride {
+			return pterr.New(pterr.ClassConfig, "engine.patch.caps_up",
+				applyPatchOp, "raising a safety cap requires the cap-override flag")
+		}
+		if err := r.audit.Append(audit.Event{
+			Actor:    r.AgentID(),
+			Action:   audit.ActionCapOverrideEnabled,
+			Resource: r.ID(),
+			Detail:   map[string]string{"run_id": r.ID()},
+		}); err != nil {
+			return err
+		}
+	}
+	r.caps = next
+	detail["caps"] = "patched"
+	return nil
+}
+
+func (r *Run) patchConcurrency(n int, detail map[string]string) error {
+	if n <= 0 {
+		return pterr.New(pterr.ClassConfig, "engine.patch.concurrency",
+			applyPatchOp, "concurrency must be >= 1")
+	}
+	r.sem.setLimit(n)
+	detail["concurrency"] = strconv.Itoa(n)
+	return nil
+}
+
+func (r *Run) patchWeights(w MixWeights, detail map[string]string) error {
+	norm, err := r.normalizeWeights(w)
+	if err != nil {
+		return err
+	}
+	r.weights = norm
+	detail["weights"] = "patched"
+	return nil
+}
+
+func (r *Run) patchRotation(sec int, detail map[string]string) error {
+	if sec < 0 {
+		return pterr.New(pterr.ClassConfig, "engine.patch.rotation",
+			applyPatchOp, "rotation interval seconds must be >= 0")
+	}
+	r.selector.setInterval(time.Duration(sec) * time.Second)
+	detail["rotation_interval_sec"] = strconv.Itoa(sec)
+	return nil
+}
+
+func (r *Run) patchTargetsAdd(specs []TargetSpec, detail map[string]string) error {
+	for _, spec := range specs {
 		blk, ok := r.blockByID(spec.BlockID)
 		if !ok {
 			return pterr.New(pterr.ClassConfig, targetsAddOp,
@@ -123,8 +156,11 @@ func (r *Run) ApplyPatch(_ context.Context, p ScenarioPatch) error {
 		r.breakers[tid] = safety.NewBreaker(r.engine.opts.Clock, breakerThreshold, breakerCooldown)
 		detail["targets_add"] = detail["targets_add"] + tid + " "
 	}
+	return nil
+}
 
-	for _, tid := range p.TargetsDisable {
+func (r *Run) patchTargetsDisable(tids []string, detail map[string]string) error {
+	for _, tid := range tids {
 		b, ok := r.breakers[tid]
 		if !ok {
 			return pterr.New(pterr.ClassConfig, "engine.patch.targets_disable",
@@ -133,8 +169,7 @@ func (r *Run) ApplyPatch(_ context.Context, p ScenarioPatch) error {
 		b.ForceOpen()
 		detail["targets_disable"] = detail["targets_disable"] + tid + " "
 	}
-
-	return r.finishPatch(detail)
+	return nil
 }
 
 // capsRaised reports whether next loosens any cap relative to cur.

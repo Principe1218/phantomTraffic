@@ -39,7 +39,7 @@ func TestRunActionTransientRetryThenSuccess(t *testing.T) {
 	vs := &fakeVSession{steps: []behavior.Step{newStepWithAction(tgt), {Done: true}}}
 	sess := newTestSession(clk, r)
 
-	done := runWorkerAsync(context.Background(), sess, vs, d, clk)
+	done := runWorkerAsync(context.Background(), sess, vs, d)
 
 	// Let the worker reach the retry backoff Sleep, then advance past it.
 	time.Sleep(20 * time.Millisecond)
