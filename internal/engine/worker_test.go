@@ -167,7 +167,7 @@ func newWorkerDeps(t *testing.T, clk *clock.FakeClock, r rng.Rand, h protocols.P
 // so any clock.Sleep(Wait) calls unblock. It returns a channel closed when the
 // worker returns. Steps here use Wait==0 so no clock advance is strictly required,
 // but we advance once to be safe with the register-before-advance idiom.
-func runWorkerAsync(ctx context.Context, sess *protocols.Session, vs behavior.Session, d workerDeps, clk *clock.FakeClock) <-chan struct{} {
+func runWorkerAsync(ctx context.Context, sess *protocols.Session, vs behavior.Session, d workerDeps) <-chan struct{} {
 	done := make(chan struct{})
 	go func() {
 		defer close(done)
@@ -193,7 +193,7 @@ func TestRunWorkerHappyPath(t *testing.T) {
 	}}
 	sess := newTestSession(clk, r)
 
-	done := runWorkerAsync(context.Background(), sess, vs, d, clk)
+	done := runWorkerAsync(context.Background(), sess, vs, d)
 	// No Wait on these steps, but advance once to honor the idiom for any sleeps.
 	time.Sleep(20 * time.Millisecond)
 	clk.Advance(time.Second)
