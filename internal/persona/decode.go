@@ -17,87 +17,109 @@ func parseDur(s string) (time.Duration, error) {
 	return time.ParseDuration(s)
 }
 
-// parseDist builds a behavior.Distribution from its tagged-union raw shape.
+// parseDist builds a behavior.Distribution from its tagged-union raw shape. It
+// dispatches by kind to a per-kind builder; each builder parses its durations
+// and validates its own parameter invariants.
 func parseDist(rd RawDist) (behavior.Distribution, error) {
 	switch rd.Kind {
 	case "constant":
-		d, err := parseDur(rd.D)
-		if err != nil {
-			return nil, fmt.Errorf("d: %w", err)
-		}
-		if d < 0 {
-			return nil, fmt.Errorf("d must be >= 0")
-		}
-		return behavior.Constant{D: d}, nil
+		return parseConstant(rd)
 	case "uniform":
-		mn, err := parseDur(rd.Min)
-		if err != nil {
-			return nil, fmt.Errorf("min: %w", err)
-		}
-		mx, err := parseDur(rd.Max)
-		if err != nil {
-			return nil, fmt.Errorf("max: %w", err)
-		}
-		if mn < 0 {
-			return nil, fmt.Errorf("min must be >= 0")
-		}
-		if mx < mn {
-			return nil, fmt.Errorf("max must be >= min")
-		}
-		return behavior.Uniform{Min: mn, Max: mx}, nil
+		return parseUniform(rd)
 	case "normal":
-		mean, err := parseDur(rd.Mean)
-		if err != nil {
-			return nil, fmt.Errorf("mean: %w", err)
-		}
-		std, err := parseDur(rd.StdDev)
-		if err != nil {
-			return nil, fmt.Errorf("stddev: %w", err)
-		}
-		mn, err := parseDur(rd.Min)
-		if err != nil {
-			return nil, fmt.Errorf("min: %w", err)
-		}
-		mx, err := parseDur(rd.Max)
-		if err != nil {
-			return nil, fmt.Errorf("max: %w", err)
-		}
-		if std < 0 {
-			return nil, fmt.Errorf("stddev must be >= 0")
-		}
-		if mn < 0 {
-			return nil, fmt.Errorf("min must be >= 0")
-		}
-		if mx < mn {
-			return nil, fmt.Errorf("max must be >= min")
-		}
-		return behavior.Normal{Mean: mean, StdDev: std, Min: mn, Max: mx}, nil
+		return parseNormal(rd)
 	case "lognormal":
-		scale, err := parseDur(rd.Scale)
-		if err != nil {
-			return nil, fmt.Errorf("scale: %w", err)
-		}
-		if rd.Sigma < 0 {
-			return nil, fmt.Errorf("sigma must be >= 0")
-		}
-		if scale < 0 {
-			return nil, fmt.Errorf("scale must be >= 0")
-		}
-		return behavior.LogNormal{Mu: rd.Mu, Sigma: rd.Sigma, Scale: scale}, nil
+		return parseLogNormal(rd)
 	case "exponential":
-		mean, err := parseDur(rd.Mean)
-		if err != nil {
-			return nil, fmt.Errorf("mean: %w", err)
-		}
-		if mean <= 0 {
-			return nil, fmt.Errorf("mean must be > 0")
-		}
-		return behavior.Exponential{Mean: mean}, nil
+		return parseExponential(rd)
 	case "":
 		return nil, fmt.Errorf("kind is required")
 	default:
 		return nil, fmt.Errorf("unknown kind %q", rd.Kind)
 	}
+}
+
+func parseConstant(rd RawDist) (behavior.Distribution, error) {
+	d, err := parseDur(rd.D)
+	if err != nil {
+		return nil, fmt.Errorf("d: %w", err)
+	}
+	if d < 0 {
+		return nil, fmt.Errorf("d must be >= 0")
+	}
+	return behavior.Constant{D: d}, nil
+}
+
+func parseUniform(rd RawDist) (behavior.Distribution, error) {
+	mn, err := parseDur(rd.Min)
+	if err != nil {
+		return nil, fmt.Errorf("min: %w", err)
+	}
+	mx, err := parseDur(rd.Max)
+	if err != nil {
+		return nil, fmt.Errorf("max: %w", err)
+	}
+	if mn < 0 {
+		return nil, fmt.Errorf("min must be >= 0")
+	}
+	if mx < mn {
+		return nil, fmt.Errorf("max must be >= min")
+	}
+	return behavior.Uniform{Min: mn, Max: mx}, nil
+}
+
+func parseNormal(rd RawDist) (behavior.Distribution, error) {
+	mean, err := parseDur(rd.Mean)
+	if err != nil {
+		return nil, fmt.Errorf("mean: %w", err)
+	}
+	std, err := parseDur(rd.StdDev)
+	if err != nil {
+		return nil, fmt.Errorf("stddev: %w", err)
+	}
+	mn, err := parseDur(rd.Min)
+	if err != nil {
+		return nil, fmt.Errorf("min: %w", err)
+	}
+	mx, err := parseDur(rd.Max)
+	if err != nil {
+		return nil, fmt.Errorf("max: %w", err)
+	}
+	if std < 0 {
+		return nil, fmt.Errorf("stddev must be >= 0")
+	}
+	if mn < 0 {
+		return nil, fmt.Errorf("min must be >= 0")
+	}
+	if mx < mn {
+		return nil, fmt.Errorf("max must be >= min")
+	}
+	return behavior.Normal{Mean: mean, StdDev: std, Min: mn, Max: mx}, nil
+}
+
+func parseLogNormal(rd RawDist) (behavior.Distribution, error) {
+	scale, err := parseDur(rd.Scale)
+	if err != nil {
+		return nil, fmt.Errorf("scale: %w", err)
+	}
+	if rd.Sigma < 0 {
+		return nil, fmt.Errorf("sigma must be >= 0")
+	}
+	if scale < 0 {
+		return nil, fmt.Errorf("scale must be >= 0")
+	}
+	return behavior.LogNormal{Mu: rd.Mu, Sigma: rd.Sigma, Scale: scale}, nil
+}
+
+func parseExponential(rd RawDist) (behavior.Distribution, error) {
+	mean, err := parseDur(rd.Mean)
+	if err != nil {
+		return nil, fmt.Errorf("mean: %w", err)
+	}
+	if mean <= 0 {
+		return nil, fmt.Errorf("mean must be > 0")
+	}
+	return behavior.Exponential{Mean: mean}, nil
 }
 
 // parseJitter builds a behavior.JitterModel (omitted/none -> NoJitter).

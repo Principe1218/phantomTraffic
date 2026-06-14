@@ -1,7 +1,7 @@
 package behavior
 
 import (
-	_ "embed"
+	_ "embed" // enables the //go:embed directive that loads fingerprints.json
 	"encoding/json"
 	"fmt"
 	"strconv"
