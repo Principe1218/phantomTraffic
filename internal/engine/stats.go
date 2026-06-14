@@ -49,7 +49,7 @@ func (s *counterShard) record(r protocols.Result) {
 		s.panics.Add(1)
 	case protocols.OutcomeFailure:
 		s.failures.Add(1)
-	// OutcomeSkipped and OutcomeCancelled are benign non-events; not failures.
+		// OutcomeSkipped and OutcomeCancelled are benign non-events; not failures.
 	}
 	if r.BytesIn != 0 {
 		s.bytesIn.Add(r.BytesIn)

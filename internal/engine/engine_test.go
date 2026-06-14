@@ -92,7 +92,7 @@ func TestNewErrorIsConfigClass(t *testing.T) {
 	}
 	// The error must carry a ClassConfig pterr so callers can branch on it.
 	var perr interface{ Class() any }
-	_ = perr // documentation: the concrete assertion is below via pterr.IsClass
+	_ = perr                  // documentation: the concrete assertion is below via pterr.IsClass
 	if !errors.Is(err, err) { // trivially true; kept to anchor the import
 		t.Fatal("unreachable")
 	}

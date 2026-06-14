@@ -4,8 +4,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/Principe1218/phantomTraffic/internal/schedule"
 	"github.com/Principe1218/phantomTraffic/internal/scenario"
+	"github.com/Principe1218/phantomTraffic/internal/schedule"
 )
 
 // mustLoc loads a named location or fails the test; the Go time zone database is

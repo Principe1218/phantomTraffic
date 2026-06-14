@@ -14,7 +14,7 @@ func TestCapSpecWithPatch(t *testing.T) {
 		MaxConcurrentSessions:        20,
 		TotalRequestBudget:           1_000_000,
 		StreamingByteRateKbps:        12_000,
-		ConcurrentStreams:             3,
+		ConcurrentStreams:            3,
 		PerSessionMaxDurationSeconds: 1800,
 		PerSessionMaxActions:         10_000,
 	}
