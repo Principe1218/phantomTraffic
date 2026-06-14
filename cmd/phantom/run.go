@@ -89,7 +89,7 @@ func runRun(args []string, stdout, stderr io.Writer) int {
 	// the forbidigo time.Now boundary is not crossed inside the package.
 	r := rng.New(
 		uint64(time.Now().UnixNano()),
-		uint64(os.Getpid())*0x9e3779b97f4a7c15,
+		uint64(os.Getpid())*0x9e3779b97f4a7c15, // #nosec G115 -- os.Getpid() is always non-negative on POSIX
 	)
 
 	e, err := engine.New(engine.Options{
@@ -116,7 +116,7 @@ func runRun(args []string, stdout, stderr io.Writer) int {
 	}
 
 	if !*asJSON {
-		_, _ = fmt.Fprintf(stdout, "▶ run %s started\n", run.ID())
+		_, _ = fmt.Fprintf(stdout, "▶ run %s started\n", run.ID()) // #nosec G705 -- stdout is a CLI io.Writer, not an HTTP response
 	}
 
 	// Build a deadline context for --duration; if unset, it never fires.
@@ -142,7 +142,7 @@ func runRun(args []string, stdout, stderr io.Writer) int {
 	if *asJSON {
 		writeRunReport(stdout, run.ID(), run.State().String(), snap)
 	} else {
-		_, _ = fmt.Fprintf(stdout,
+		_, _ = fmt.Fprintf(stdout, // #nosec G705 -- stdout is a CLI io.Writer, not an HTTP response
 			"✓ run %s %s: %d requests (%d ok, %d failed, %d panics)\n",
 			run.ID(), run.State(), snap.Requests, snap.Successes, snap.Failures, snap.Panics)
 	}
