@@ -64,32 +64,13 @@ func runRun(args []string, stdout, stderr io.Writer) int {
 		return 2
 	}
 
-	raw, err := scenario.Load(file)
-	if err != nil {
-		if errors.Is(err, os.ErrNotExist) {
-			_, _ = fmt.Fprintf(stderr, "phantom run: file not found: %s\n", file)
-			return 2
-		}
-		_, _ = fmt.Fprintf(stderr, "phantom run: load %s: %v\n", file, err)
-		return 2
-	}
-
-	scn, err := scenario.Validate(raw, scenario.Options{
+	scn, code := loadValidatedScenario(file, scenario.Options{
 		AllowInsecure: *allowInsecure,
 		CapOverride:   *capOverride,
 		AgentCount:    *agentCount,
-	})
-	if err != nil {
-		var verrs pterr.FieldErrors
-		if errors.As(err, &verrs) {
-			for _, fe := range verrs {
-				_, _ = fmt.Fprintf(stderr, "  %s: %s\n", fe.Field, fe.Msg)
-			}
-			_, _ = fmt.Fprintf(stderr, "✗ %s: invalid (%d errors)\n", file, len(verrs))
-			return 1
-		}
-		_, _ = fmt.Fprintf(stderr, "phantom run: validate %s: %v\n", file, err)
-		return 1
+	}, stderr)
+	if code != 0 {
+		return code
 	}
 
 	agentID, err := idgen.CorrelationID()
@@ -108,7 +89,7 @@ func runRun(args []string, stdout, stderr io.Writer) int {
 	// the forbidigo time.Now boundary is not crossed inside the package.
 	r := rng.New(
 		uint64(time.Now().UnixNano()),
-		uint64(uint(os.Getpid()))*0x9e3779b97f4a7c15,
+		uint64(os.Getpid())*0x9e3779b97f4a7c15,
 	)
 
 	e, err := engine.New(engine.Options{
@@ -146,27 +127,11 @@ func runRun(args []string, stdout, stderr io.Writer) int {
 		defer limitCancel()
 	}
 
-	// Signal handling: SIGINT / SIGTERM requests a graceful Stop.
 	sigCh := make(chan os.Signal, 1)
 	signal.Notify(sigCh, os.Interrupt, syscall.SIGTERM)
 	defer signal.Stop(sigCh)
 
-	stopRun := func() {
-		graceCtx, graceCancel := context.WithTimeout(context.Background(), 30*time.Second)
-		defer graceCancel()
-		_ = run.Stop(graceCtx)
-	}
-
-	select {
-	case <-run.Wait():
-		// Scenario duration elapsed: run completed naturally.
-	case <-limitCtx.Done():
-		// --duration timeout: graceful stop.
-		stopRun()
-	case <-sigCh:
-		// Operator signal: graceful stop.
-		stopRun()
-	}
+	awaitRun(run, limitCtx, sigCh)
 
 	snap := run.Snapshot()
 	if runErr := run.Err(); runErr != nil {
@@ -182,6 +147,55 @@ func runRun(args []string, stdout, stderr io.Writer) int {
 			run.ID(), run.State(), snap.Requests, snap.Successes, snap.Failures, snap.Panics)
 	}
 	return 0
+}
+
+// loadValidatedScenario loads and validates the scenario at file, writing all
+// error messages to stderr. Returns (scenario, 0) on success, or (zero-value,
+// non-zero exit code) on failure.
+func loadValidatedScenario(file string, opts scenario.Options, stderr io.Writer) (scenario.Scenario, int) {
+	raw, err := scenario.Load(file)
+	if err != nil {
+		if errors.Is(err, os.ErrNotExist) {
+			_, _ = fmt.Fprintf(stderr, "phantom run: file not found: %s\n", file)
+			return scenario.Scenario{}, 2
+		}
+		_, _ = fmt.Fprintf(stderr, "phantom run: load %s: %v\n", file, err)
+		return scenario.Scenario{}, 2
+	}
+	scn, err := scenario.Validate(raw, opts)
+	if err != nil {
+		var verrs pterr.FieldErrors
+		if errors.As(err, &verrs) {
+			for _, fe := range verrs {
+				_, _ = fmt.Fprintf(stderr, "  %s: %s\n", fe.Field, fe.Msg)
+			}
+			_, _ = fmt.Fprintf(stderr, "✗ %s: invalid (%d errors)\n", file, len(verrs))
+			return scenario.Scenario{}, 1
+		}
+		_, _ = fmt.Fprintf(stderr, "phantom run: validate %s: %v\n", file, err)
+		return scenario.Scenario{}, 1
+	}
+	return scn, 0
+}
+
+// awaitRun blocks until the run completes naturally, the limit context fires,
+// or an OS signal arrives. Stops the run gracefully on timeout or signal.
+func awaitRun(run *engine.Run, limitCtx context.Context, sigCh <-chan os.Signal) {
+	stopRun := func() {
+		graceCtx, graceCancel := context.WithTimeout(context.Background(), 30*time.Second)
+		defer graceCancel()
+		_ = run.Stop(graceCtx)
+	}
+	select {
+	case <-run.Wait():
+		// Scenario duration elapsed: run completed naturally.
+	case <-limitCtx.Done():
+		// --duration timeout: graceful stop.
+		stopRun()
+	case <-sigCh:
+		// Operator signal: graceful stop.
+		stopRun()
+	}
 }
 
 func writeRunReport(w io.Writer, runID, state string, snap engine.StatsSnapshot) {

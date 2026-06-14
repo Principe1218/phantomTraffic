@@ -502,7 +502,7 @@ func validateWindow(acc *errAccumulator, i int, rw RawWindow) ScheduleWindow {
 			acc.add(scheduleWindowPath(i, "days")+"["+strconv.Itoa(j)+"]", "unknown day "+strconv.Quote(d))
 			continue
 		}
-		w.Days[int(wd)] = true
+		w.Days[int(wd)] = true //nolint:gosec // G602: wd is a time.Weekday (0–6) sourced exclusively from weekdayByName
 	}
 
 	start, startOK := parseHHMM(rw.Start)
