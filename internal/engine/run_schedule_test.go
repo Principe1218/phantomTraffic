@@ -12,17 +12,13 @@ import (
 // scenarioWithSchedule builds a single-block scenario whose schedule has one
 // window 08:00-18:00 UTC on every day, so an off-window edge is reachable by
 // advancing the fake clock past 18:00.
-func scenarioWithSchedule(t *testing.T, start time.Time) scenario.Scenario {
+func scenarioWithSchedule(t *testing.T) scenario.Scenario {
 	t.Helper()
 	sc := testScenario(t, 24*time.Hour)
-	var allDays [7]bool
-	for i := range allDays {
-		allDays[i] = true
-	}
 	sc.Schedule = scenario.Schedule{
 		Loc: time.UTC,
 		Windows: []scenario.ScheduleWindow{{
-			Days:  allDays,
+			Days:  [7]bool{true, true, true, true, true, true, true},
 			Start: 8 * time.Hour,
 			End:   18 * time.Hour,
 		}},
@@ -37,7 +33,7 @@ func TestSchedulerPausesOnOffWindowEdge(t *testing.T) {
 	fc := clock.NewFake(start)
 	e := newEngineWithNoop(t, fc)
 
-	run, err := e.Start(context.Background(), scenarioWithSchedule(t, start))
+	run, err := e.Start(context.Background(), scenarioWithSchedule(t))
 	if err != nil {
 		t.Fatalf("Start: %v", err)
 	}
