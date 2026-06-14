@@ -8,6 +8,7 @@ linters:
   enable:
     - depguard
     - forbidigo
+    - gofmt
     - gosec
     - govet
     - ineffassign
