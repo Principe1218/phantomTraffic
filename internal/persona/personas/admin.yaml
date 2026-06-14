@@ -1,0 +1,20 @@
+name: admin
+think_time: { kind: lognormal, mu: 1.4, sigma: 0.6, scale: 1s }
+jitter: { kind: proportional, fraction: 0.12 }
+burst:
+  active: { kind: exponential, mean: 60s }
+  idle: { kind: lognormal, mu: 2.5, sigma: 0.7, scale: 1s }
+time_of_day:
+  location: "UTC"
+  weekday: [0.20, 0.15, 0.12, 0.10, 0.10, 0.12, 0.20, 0.35, 0.60, 0.80, 0.90, 0.95, 0.85, 0.90, 1.00, 0.95, 0.85, 0.70, 0.55, 0.45, 0.40, 0.35, 0.30, 0.25]
+  weekend: [0.20, 0.15, 0.12, 0.10, 0.10, 0.10, 0.12, 0.15, 0.25, 0.35, 0.45, 0.50, 0.50, 0.50, 0.50, 0.45, 0.40, 0.35, 0.30, 0.30, 0.28, 0.25, 0.22, 0.20]
+session:
+  length: { kind: normal, mean: 25m, stddev: 8m, min: 5m, max: 90m }
+  inter_task: { kind: lognormal, mu: 1.6, sigma: 0.6, scale: 1s }
+  abandon: 0.05
+mix:
+  - { protocol: ssh, verb: run, cause: navigation, pacing: shaper-managed, weight: 6 }
+  - { protocol: ssh, verb: open-shell, cause: navigation, pacing: shaper-managed, weight: 2 }
+  - { protocol: http, verb: fetch-page, cause: navigation, pacing: shaper-managed, weight: 1 }
+  - { protocol: dns, verb: resolve-name, cause: navigation, pacing: shaper-managed, weight: 1 }
+fingerprints: default
