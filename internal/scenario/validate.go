@@ -197,6 +197,17 @@ func toCapSpec(rc RawCaps) safety.CapSpec {
 	}
 }
 
+// validateAllowedDomains validates each host-only allowlist entry (no port) and
+// appends any errors to acc. Entries that are not valid hostnames would silently
+// become dead, never-matching rows — catch them eagerly (AGENTS.md §5.2).
+func validateAllowedDomains(acc *errAccumulator, domains []string) {
+	for i, d := range domains {
+		if !validHost(strings.TrimSpace(d)) {
+			acc.add("allowed_domains["+strconv.Itoa(i)+"]", "not a valid hostname")
+		}
+	}
+}
+
 // Validate is the PURE aggregator: it turns a decoded Raw into a FROZEN Scenario
 // or a non-nil ValidationErrors listing EVERY problem found (each ClassConfig).
 // It performs NO network, NO filesystem, NO runtime enforcement, NO audit write.
@@ -259,11 +270,7 @@ func Validate(raw Raw, opts Options) (Scenario, error) {
 	// allowed_domains are host-only allowlist entries (no port). Validate each so a
 	// malformed entry can't silently become a dead, never-matching allowlist row
 	// (design §5.2 — allowed_domains are host-validated, like targets).
-	for i, d := range raw.AllowedDomains {
-		if !validHost(strings.TrimSpace(d)) {
-			acc.add("allowed_domains["+strconv.Itoa(i)+"]", "not a valid hostname")
-		}
-	}
+	validateAllowedDomains(&acc, raw.AllowedDomains)
 
 	// Weighting strategy for the block mix (design §6.7). "" defaults to
 	// WeightByVuserPopulation; an unknown value is rejected.
