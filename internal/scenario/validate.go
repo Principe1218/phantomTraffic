@@ -285,6 +285,7 @@ func Validate(raw Raw, opts Options) (Scenario, error) {
 		AgentCount:     agentCount,
 		Caps:           caps,
 		Ceiling:        ceiling,
+		CapOverride:    opts.CapOverride,
 		Execution:      Execution{Mode: mode, StopOnError: raw.Execution.StopOnError},
 		Blocks:         blocks,
 		Targets:        protocols.NewTargetSet(allTargets, raw.AllowedDomains),

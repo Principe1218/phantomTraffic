@@ -15,7 +15,10 @@ import (
 )
 
 // Backstop tuning for the supervisor (design §6.6, §6.8).
-const breakerThreshold = 5
+const (
+	breakerThreshold = 5
+	breakerCooldown  = 30 * time.Second
+)
 
 // Start builds the cancellation tree and supervisor and returns immediately with
 // the run in StateRunning (design §9 — Start is non-blocking).
@@ -33,27 +36,29 @@ func (e *Engine) Start(ctx context.Context, sc scenario.Scenario) (*Run, error) 
 	lim := safety.NewLimiter(e.opts.Clock, sc.Caps, tw)
 	breakers := make(map[string]*safety.Breaker, len(targetIDs))
 	for _, id := range targetIDs {
-		breakers[id] = safety.NewBreaker(e.opts.Clock, breakerThreshold, 30*time.Second)
+		breakers[id] = safety.NewBreaker(e.opts.Clock, breakerThreshold, breakerCooldown)
 	}
 	coll := newCollector(targetIDs, e.opts.Clock, lim.Saturation)
 	pub := newPublisher(coll.snapshot())
 
 	r := &Run{
-		id:       runID,
-		agentID:  e.opts.AgentID,
-		clk:      e.opts.Clock,
-		audit:    e.opts.Audit,
-		engine:   e,
-		sc:       sc,
-		runCtx:   runCtx,
-		cancel:   cancel,
-		gate:     newGate(e.opts.Clock),
-		coll:     coll,
-		pub:      pub,
-		limiter:  lim,
-		breakers: breakers,
-		tripwire: tw,
-		done:     make(chan struct{}),
+		id:          runID,
+		agentID:     e.opts.AgentID,
+		clk:         e.opts.Clock,
+		audit:       e.opts.Audit,
+		engine:      e,
+		sc:          sc,
+		runCtx:      runCtx,
+		cancel:      cancel,
+		gate:        newGate(e.opts.Clock),
+		coll:        coll,
+		pub:         pub,
+		limiter:     lim,
+		breakers:    breakers,
+		tripwire:    tw,
+		done:        make(chan struct{}),
+		caps:        sc.Caps,
+		capOverride: sc.CapOverride,
 	}
 	r.state.Store(int32(StateIdle))
 
@@ -71,6 +76,11 @@ func (e *Engine) Start(ctx context.Context, sc scenario.Scenario) (*Run, error) 
 func (r *Run) startSupervisor() {
 	remaining := len(r.sc.Blocks)
 	r.blocksLeft.Store(int32(remaining))
+
+	r.weights = make(map[string]uint, len(r.sc.Blocks))
+	for _, b := range r.sc.Blocks {
+		r.weights[b.ID] = b.Weight
+	}
 
 	for i := range r.sc.Blocks {
 		block := r.sc.Blocks[i]
@@ -95,11 +105,15 @@ func (r *Run) startSupervisor() {
 // startBlock spawns the per-block vuser pool, ramp governor, and completion timer.
 func (r *Run) startBlock(block scenario.Block) {
 	sem := newSemaphore(initialLimit(block))
+	sel := r.newSelectorFor(block)
+
 	r.mu.Lock()
 	r.sems = append(r.sems, sem)
+	if r.sem == nil {
+		r.sem = sem
+		r.selector = sel
+	}
 	r.mu.Unlock()
-
-	sel := r.newSelectorFor(block)
 	for v := 0; v < block.Concurrency; v++ {
 		vsess, sess, ok := r.buildSession(block, sel)
 		if !ok {
@@ -235,10 +249,13 @@ func initialLimit(block scenario.Block) int {
 	return n
 }
 
-func (r *Run) newSelectorFor(block scenario.Block) behavior.TargetSelector {
+func (r *Run) newSelectorFor(block scenario.Block) *rotatingSelector {
 	byProto := map[protocols.ProtocolID][]protocols.Target{block.Protocol: block.Targets}
 	return newRotatingSelector(r.clk, r.engine.opts.Rand.Split(), block.Rotation, block.RotationInterval, byProto)
 }
+
+// Snapshot returns a point-in-time stats snapshot from the collector.
+func (r *Run) Snapshot() StatsSnapshot { return r.coll.snapshot() }
 
 // buildSession assembles a behavior.Session for one vuser.
 func (r *Run) buildSession(block scenario.Block, sel behavior.TargetSelector) (behavior.Session, *protocols.Session, bool) {

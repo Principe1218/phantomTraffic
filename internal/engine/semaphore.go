@@ -66,6 +66,13 @@ func (s *semaphore) release() {
 	s.cond.Signal()
 }
 
+// currentLimit returns the semaphore's current admission limit.
+func (s *semaphore) currentLimit() int {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.limit
+}
+
 // setLimit resizes the live concurrency budget. Raising it wakes waiters that can
 // now proceed; lowering it just stops issuing (held may temporarily exceed limit).
 func (s *semaphore) setLimit(n int) {

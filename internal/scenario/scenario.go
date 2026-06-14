@@ -76,6 +76,7 @@ type Scenario struct {
 	AgentCount     int
 	Caps           safety.CapSpec
 	Ceiling        safety.Ceiling
+	CapOverride    bool // true when opts.CapOverride was set; gates cap-raising in ApplyPatch
 	Execution      Execution
 	Blocks         []Block
 	Targets        protocols.TargetSet

@@ -35,6 +35,18 @@ func (s *recordingSink) actions() []audit.Action {
 	return out
 }
 
+func (s *recordingSink) count(a audit.Action) int {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	n := 0
+	for _, e := range s.events {
+		if e.Action == a {
+			n++
+		}
+	}
+	return n
+}
+
 func TestStateString(t *testing.T) {
 	cases := []struct {
 		s    State

@@ -1,6 +1,7 @@
 package engine
 
 import (
+	"sync"
 	"sync/atomic"
 	"time"
 
@@ -59,45 +60,79 @@ func (s *counterShard) record(r protocols.Result) {
 	s.hist.record(r.Latency)
 }
 
-// collector implements protocols.StatsRecorder over a static target set. Shards
-// are built once at scenario start (no runtime write races); the only growth
-// point is ApplyPatch.TargetsAdd under the engine's documented write barrier.
+// collector implements protocols.StatsRecorder over a growable target set.
+// Shards are built at scenario start; ApplyPatch.TargetsAdd may append under
+// patchMu (the engine write barrier). mu guards shards+targetIDs so the
+// snapshot reader and the rare addShard writer never race.
 type collector struct {
 	global     counterShard
-	perTarget  map[string]*counterShard
+	shards     map[string]*counterShard // guarded by mu
+	mu         sync.RWMutex
+	targetIDs  []string // guarded by mu
 	active     atomic.Int64
 	clk        clock.Clock
 	saturation func() float64
 }
 
+func newCounterShard() *counterShard { return &counterShard{} }
+
 func newCollector(targetIDs []string, clk clock.Clock, saturation func() float64) *collector {
 	if saturation == nil {
 		saturation = func() float64 { return 0 }
 	}
-	pt := make(map[string]*counterShard, len(targetIDs))
+	shards := make(map[string]*counterShard, len(targetIDs))
+	ids := make([]string, 0, len(targetIDs))
 	for _, id := range targetIDs {
-		pt[id] = &counterShard{}
+		shards[id] = newCounterShard()
+		ids = append(ids, id)
 	}
-	return &collector{perTarget: pt, clk: clk, saturation: saturation}
+	return &collector{shards: shards, targetIDs: ids, clk: clk, saturation: saturation}
 }
 
-// Record implements protocols.StatsRecorder. Hot path: atomics only. Unknown
-// targets count globally but get no PerTarget shard (no runtime fabrication).
+// Record implements protocols.StatsRecorder. Hot path: one RLock for the map
+// lookup, then atomics on the shard. Unknown targets count globally only.
 func (c *collector) Record(r protocols.Result) {
 	c.global.record(r)
-	if shard, ok := c.perTarget[r.Target]; ok {
+	c.mu.RLock()
+	shard := c.shards[r.Target]
+	c.mu.RUnlock()
+	if shard != nil {
 		shard.record(r)
 	}
+}
+
+// addShard appends a per-target shard under the write barrier. It is safe ONLY
+// when called from ApplyPatch under r.patchMu; the RWMutex guards against
+// concurrent snapshot reads.
+func (c *collector) addShard(targetID string) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	if _, ok := c.shards[targetID]; ok {
+		return // idempotent
+	}
+	c.shards[targetID] = newCounterShard()
+	c.targetIDs = append(c.targetIDs, targetID)
 }
 
 func (c *collector) incActive() { c.active.Add(1) }
 func (c *collector) decActive() { c.active.Add(-1) }
 
-// snapshot folds shards read-only into an immutable StatsSnapshot.
+// snapshot folds shards read-only into an immutable StatsSnapshot. It takes
+// the read lock to capture a consistent view of shards+targetIDs.
 func (c *collector) snapshot() StatsSnapshot {
-	perTarget := make(map[string]TargetStats, len(c.perTarget))
+	c.mu.RLock()
+	ids := make([]string, len(c.targetIDs))
+	copy(ids, c.targetIDs)
+	shardsCopy := make(map[string]*counterShard, len(c.shards))
+	for k, v := range c.shards {
+		shardsCopy[k] = v
+	}
+	c.mu.RUnlock()
+
+	perTarget := make(map[string]TargetStats, len(ids))
 	var merged histogram
-	for id, s := range c.perTarget {
+	for _, id := range ids {
+		s := shardsCopy[id]
 		perTarget[id] = TargetStats{
 			Requests:  s.requests.Load(),
 			Successes: s.successes.Load(),

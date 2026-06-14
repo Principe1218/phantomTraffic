@@ -126,6 +126,15 @@ type Run struct {
 	err  error
 	sems []*semaphore
 
+	// patchMu is the single write barrier for all ApplyPatch mutations. The hot
+	// path (Record, gate) never holds it; it is only held during a live patch.
+	patchMu     sync.Mutex
+	caps        safety.CapSpec
+	capOverride bool
+	sem         *semaphore        // first block's semaphore; set by startBlock
+	weights     map[string]uint   // block ID -> weight; set by startSupervisor
+	selector    *rotatingSelector // first block's selector; set by startBlock
+
 	wg         sync.WaitGroup
 	blocksLeft atomic.Int32
 

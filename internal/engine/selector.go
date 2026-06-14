@@ -73,6 +73,34 @@ func (s *rotatingSelector) Next(proto protocols.ProtocolID) (protocols.Target, b
 	return st.targets[st.idx], true
 }
 
+// currentInterval returns the selector's current rotation interval.
+func (s *rotatingSelector) currentInterval() time.Duration {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.interval
+}
+
+// setInterval updates the rotation interval. Workers see the new interval on their
+// next call to Next (no restart required).
+func (s *rotatingSelector) setInterval(d time.Duration) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.interval = d
+}
+
+// addTarget appends a target to the specified protocol's rotation list under the
+// selector mutex so the addition is visible to the next Next() call.
+func (s *rotatingSelector) addTarget(proto protocols.ProtocolID, t protocols.Target) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if st, ok := s.byProto[proto]; ok {
+		st.targets = append(st.targets, t)
+	} else {
+		now := s.clk.Now()
+		s.byProto[proto] = &protoState{targets: []protocols.Target{t}, idx: 0, lastRotate: now}
+	}
+}
+
 // maybeRotate advances st.idx when interval > 0 and at least one full interval has
 // elapsed since the last rotation. Caller holds s.mu.
 func (s *rotatingSelector) maybeRotate(st *protoState) {
