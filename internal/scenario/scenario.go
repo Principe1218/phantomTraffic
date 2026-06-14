@@ -3,6 +3,7 @@ package scenario
 import (
 	"time"
 
+	"github.com/Principe1218/phantomTraffic/internal/persona"
 	"github.com/Principe1218/phantomTraffic/internal/protocols"
 	"github.com/Principe1218/phantomTraffic/internal/safety"
 )
@@ -18,6 +19,7 @@ type Block struct {
 	RotationInterval    time.Duration
 	AllowInsecure       bool
 	AllowInsecureReason string
+	Persona             persona.Persona // resolved + frozen at Validate (Plan 3)
 }
 
 // Execution is the validated, FROZEN run-mode for the scenario as a whole.

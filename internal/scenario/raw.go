@@ -1,5 +1,7 @@
 package scenario
 
+import "github.com/Principe1218/phantomTraffic/internal/persona"
+
 // RawCaps mirrors safety.CapSpec one-for-one as the on-disk YAML shape. Every
 // field is a plain scalar with an explicit yaml tag; a ZERO value means "unset"
 // (inherit the ceiling) and is interpreted by Validate (Module 5), not here.
@@ -30,15 +32,17 @@ type RawBlock struct {
 	TargetRotationIntervalSeconds int      `yaml:"target_rotation_interval_seconds"`
 	AllowInsecure                 bool     `yaml:"allow_insecure"`
 	AllowInsecureReason           string   `yaml:"allow_insecure_reason"`
+	Persona                       string   `yaml:"persona"`
 }
 
 // Raw is the whole decoded scenario file. There is intentionally NO agent_count
 // field: agent count is a CLI flag only (see Module 5 Options.AgentCount).
 type Raw struct {
-	Name           string       `yaml:"name"`
-	Description    string       `yaml:"description"`
-	AllowedDomains []string     `yaml:"allowed_domains"`
-	Caps           RawCaps      `yaml:"caps"`
-	Execution      RawExecution `yaml:"execution"`
-	Scenarios      []RawBlock   `yaml:"scenarios"`
+	Name           string               `yaml:"name"`
+	Description    string               `yaml:"description"`
+	AllowedDomains []string             `yaml:"allowed_domains"`
+	Caps           RawCaps              `yaml:"caps"`
+	Execution      RawExecution         `yaml:"execution"`
+	Scenarios      []RawBlock           `yaml:"scenarios"`
+	Personas       []persona.RawPersona `yaml:"personas"`
 }
