@@ -58,16 +58,13 @@ func TestCollectorRecordAndSnapshot(t *testing.T) {
 		t.Fatalf("At = %v, want %v", snap.At, clk.Now())
 	}
 
-	t1 := snap.PerTarget["t1"]
-	if t1.Requests != 2 || t1.Successes != 1 || t1.Failures != 1 {
-		t.Fatalf("t1 stats = %+v, want req2/succ1/fail1", t1)
-	}
-	if t1.BytesIn != 100 || t1.BytesOut != 20 {
-		t.Fatalf("t1 bytes = (%d,%d), want (100,20)", t1.BytesIn, t1.BytesOut)
-	}
-	t2 := snap.PerTarget["t2"]
-	if t2.Requests != 3 || t2.Successes != 1 {
-		t.Fatalf("t2 stats = %+v, want req3/succ1", t2)
+	for target, want := range map[string]TargetStats{
+		"t1": {Requests: 2, Successes: 1, Failures: 1, BytesIn: 100, BytesOut: 20},
+		"t2": {Requests: 3, Successes: 1, BytesIn: 50, BytesOut: 5},
+	} {
+		if got := snap.PerTarget[target]; got != want {
+			t.Fatalf("PerTarget[%q] = %+v, want %+v", target, got, want)
+		}
 	}
 
 	// Latency percentiles fold across shards and are non-zero given samples.
