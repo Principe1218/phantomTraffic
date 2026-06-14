@@ -25,6 +25,9 @@ func parseDist(rd RawDist) (behavior.Distribution, error) {
 		if err != nil {
 			return nil, fmt.Errorf("d: %w", err)
 		}
+		if d < 0 {
+			return nil, fmt.Errorf("d must be >= 0")
+		}
 		return behavior.Constant{D: d}, nil
 	case "uniform":
 		mn, err := parseDur(rd.Min)
@@ -34,6 +37,12 @@ func parseDist(rd RawDist) (behavior.Distribution, error) {
 		mx, err := parseDur(rd.Max)
 		if err != nil {
 			return nil, fmt.Errorf("max: %w", err)
+		}
+		if mn < 0 {
+			return nil, fmt.Errorf("min must be >= 0")
+		}
+		if mx < mn {
+			return nil, fmt.Errorf("max must be >= min")
 		}
 		return behavior.Uniform{Min: mn, Max: mx}, nil
 	case "normal":
@@ -53,17 +62,35 @@ func parseDist(rd RawDist) (behavior.Distribution, error) {
 		if err != nil {
 			return nil, fmt.Errorf("max: %w", err)
 		}
+		if std < 0 {
+			return nil, fmt.Errorf("stddev must be >= 0")
+		}
+		if mn < 0 {
+			return nil, fmt.Errorf("min must be >= 0")
+		}
+		if mx < mn {
+			return nil, fmt.Errorf("max must be >= min")
+		}
 		return behavior.Normal{Mean: mean, StdDev: std, Min: mn, Max: mx}, nil
 	case "lognormal":
 		scale, err := parseDur(rd.Scale)
 		if err != nil {
 			return nil, fmt.Errorf("scale: %w", err)
 		}
+		if rd.Sigma < 0 {
+			return nil, fmt.Errorf("sigma must be >= 0")
+		}
+		if scale < 0 {
+			return nil, fmt.Errorf("scale must be >= 0")
+		}
 		return behavior.LogNormal{Mu: rd.Mu, Sigma: rd.Sigma, Scale: scale}, nil
 	case "exponential":
 		mean, err := parseDur(rd.Mean)
 		if err != nil {
 			return nil, fmt.Errorf("mean: %w", err)
+		}
+		if mean <= 0 {
+			return nil, fmt.Errorf("mean must be > 0")
 		}
 		return behavior.Exponential{Mean: mean}, nil
 	case "":

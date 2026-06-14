@@ -59,6 +59,37 @@ func TestCompileErrors(t *testing.T) {
 	}
 }
 
+func TestCompileRejectsBadDistParams(t *testing.T) {
+	mut := func(f func(*RawPersona)) RawPersona { r := validRawPersona(); f(&r); return r }
+	tests := []struct {
+		name string
+		raw  RawPersona
+	}{
+		{"negative constant d", mut(func(r *RawPersona) {
+			r.ThinkTime = RawDist{Kind: "constant", D: "-1s"}
+		})},
+		{"uniform max less than min", mut(func(r *RawPersona) {
+			r.ThinkTime = RawDist{Kind: "uniform", Min: "5s", Max: "1s"}
+		})},
+		{"negative normal stddev", mut(func(r *RawPersona) {
+			r.ThinkTime = RawDist{Kind: "normal", Mean: "5s", StdDev: "-1s", Min: "0s", Max: "10s"}
+		})},
+		{"negative lognormal sigma", mut(func(r *RawPersona) {
+			r.ThinkTime = RawDist{Kind: "lognormal", Mu: 1.0, Sigma: -0.5, Scale: "1s"}
+		})},
+		{"zero exponential mean", mut(func(r *RawPersona) {
+			r.ThinkTime = RawDist{Kind: "exponential", Mean: "0s"}
+		})},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if _, err := Compile(tt.raw); err == nil {
+				t.Fatalf("expected error for %q", tt.name)
+			}
+		})
+	}
+}
+
 func TestCompileAggregatesMultipleErrors(t *testing.T) {
 	raw := validRawPersona()
 	raw.Name = ""
