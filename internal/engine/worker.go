@@ -149,7 +149,7 @@ func doWithRetry(ctx context.Context, sess *protocols.Session, handler protocols
 		}
 
 		delay := backoffDelay(attempt, d.BackoffBase, d.BackoffMax, d.Rand)
-		if serr := d.Clock.Sleep(ctx, delay); serr != nil {
+		if d.Clock.Sleep(ctx, delay) != nil {
 			return cancelResult(pa), obs
 		}
 	}

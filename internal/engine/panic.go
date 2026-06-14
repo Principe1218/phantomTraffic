@@ -12,7 +12,7 @@ import "log/slog"
 // turns panicked=true into an OutcomePanicked Result.
 func runGuarded(log *slog.Logger, fn func()) (panicked bool) {
 	defer func() {
-		if r := recover(); r != nil {
+		if recover() != nil {
 			panicked = true
 			// Log only a redacted marker; never the raw stack (debug.Stack()).
 			log.Error("worker recovered from panic", slog.String("panic", "recovered"))

@@ -116,7 +116,7 @@ func TestNoopHandler_Do_PanicMode(t *testing.T) {
 	clk := clock.NewFake(time.Unix(0, 0).UTC())
 	h := NoopHandler{Panic: true}
 	defer func() {
-		if r := recover(); r == nil {
+		if recover() == nil {
 			t.Fatalf("Do(Panic) did not panic; want a panic so the worker shim records OutcomePanicked")
 		}
 	}()
