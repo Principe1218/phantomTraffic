@@ -1,11 +1,13 @@
 package scenario
 
 import (
+	"errors"
 	"net"
 	"strconv"
 	"strings"
 	"time"
 
+	"github.com/Principe1218/phantomTraffic/internal/persona"
 	"github.com/Principe1218/phantomTraffic/internal/protocols"
 	"github.com/Principe1218/phantomTraffic/internal/safety"
 )
@@ -221,6 +223,9 @@ func Validate(raw Raw, opts Options) (Scenario, error) {
 		acc.add("execution.mode", "unknown mode "+strconv.Quote(raw.Execution.Mode)+" (allowed: parallel, sequential)")
 	}
 
+	// Personas: built-ins overlaid with validated customs, resolved per block.
+	personas := resolvePersonas(&acc, raw.Personas)
+
 	// Blocks + targets. We collect every typed target across all blocks to build
 	// the single frozen TargetSet.
 	var allTargets []protocols.Target
@@ -228,7 +233,7 @@ func Validate(raw Raw, opts Options) (Scenario, error) {
 	blocks := make([]Block, 0, len(raw.Scenarios))
 
 	for i, rb := range raw.Scenarios {
-		b := validateBlock(&acc, i, rb, opts)
+		b := validateBlock(&acc, i, rb, opts, personas)
 		if _, dup := seenID[rb.ID]; dup && rb.ID != "" {
 			acc.add(fieldPath(i, "id"), "duplicate id "+strconv.Quote(rb.ID))
 		}
@@ -278,10 +283,43 @@ func fieldPath(i int, sub string) string {
 	return "scenarios[" + strconv.Itoa(i) + "]." + sub
 }
 
+// resolvePersonas builds the name->Persona map the blocks resolve against:
+// the embedded built-ins overlaid with any validated custom personas. Each
+// custom persona is Compile-validated; its field errors are re-keyed under
+// personas[i].<field> and aggregated. A custom persona overrides a built-in of
+// the same name.
+func resolvePersonas(acc *errAccumulator, raws []persona.RawPersona) map[string]persona.Persona {
+	out := map[string]persona.Persona{}
+	builtins, err := persona.Builtins()
+	if err != nil {
+		acc.add("personas", "internal: failed to load built-in personas: "+err.Error())
+	} else {
+		for name, p := range builtins {
+			out[name] = p
+		}
+	}
+	for i, rp := range raws {
+		p, cerr := persona.Compile(rp)
+		if cerr != nil {
+			var pe persona.Errors
+			if errors.As(cerr, &pe) {
+				for _, fe := range pe {
+					acc.add("personas["+strconv.Itoa(i)+"]."+fe.Field, fe.Msg)
+				}
+			} else {
+				acc.add("personas["+strconv.Itoa(i)+"]", cerr.Error())
+			}
+			continue
+		}
+		out[p.Name] = p
+	}
+	return out
+}
+
 // validateBlock validates one RawBlock, appending any FieldErrors to acc, and
 // returns the typed Block (partial if invalid; the accumulated errors prevent
 // the partial result from ever being returned to the caller).
-func validateBlock(acc *errAccumulator, i int, rb RawBlock, opts Options) Block {
+func validateBlock(acc *errAccumulator, i int, rb RawBlock, opts Options, personas map[string]persona.Persona) Block {
 	b := Block{
 		ID:                  rb.ID,
 		AllowInsecure:       rb.AllowInsecure,
@@ -320,6 +358,16 @@ func validateBlock(acc *errAccumulator, i int, rb RawBlock, opts Options) Block 
 			continue
 		}
 		b.Targets = append(b.Targets, tgt)
+	}
+
+	name := strings.TrimSpace(rb.Persona)
+	if name == "" {
+		name = persona.DefaultPersonaName // a block may omit persona:
+	}
+	if p, ok := personas[name]; ok {
+		b.Persona = p
+	} else {
+		acc.add(fieldPath(i, "persona"), "unknown persona "+strconv.Quote(name))
 	}
 
 	validateInsecureGate(acc, i, rb, opts)
