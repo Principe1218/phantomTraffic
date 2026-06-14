@@ -6,3 +6,4 @@ scenarios:
     protocol: "http"
     targets:
       - "host.example.com"
+    duration_minutes: 5

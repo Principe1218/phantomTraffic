@@ -227,6 +227,17 @@ func Validate(raw Raw, opts Options) (Scenario, error) {
 	// Personas: built-ins overlaid with validated customs, resolved per block.
 	personas := resolvePersonas(&acc, raw.Personas)
 
+	// Effective caps must be known BEFORE the block loop: per-block concurrency is
+	// bounded by the effective MaxConcurrentSessions (design §3.3). Compute the
+	// ceiling + effective cap once, validate caps, then reuse the bound per block.
+	ceiling := safety.DefaultCeiling().DividedBy(agentCount)
+	declared := toCapSpec(raw.Caps)
+	for _, v := range safety.ValidateCaps(declared, ceiling, opts.CapOverride) {
+		acc.add("caps."+v.Field, v.Msg)
+	}
+	caps := declared.Effective(ceiling)
+	maxConcurrent := caps.MaxConcurrentSessions
+
 	// Blocks + targets. We collect every typed target across all blocks to build
 	// the single frozen TargetSet.
 	var allTargets []protocols.Target
@@ -234,7 +245,7 @@ func Validate(raw Raw, opts Options) (Scenario, error) {
 	blocks := make([]Block, 0, len(raw.Scenarios))
 
 	for i, rb := range raw.Scenarios {
-		b := validateBlock(&acc, i, rb, opts, personas)
+		b := validateBlock(&acc, i, rb, opts, personas, maxConcurrent)
 		if _, dup := seenID[rb.ID]; dup && rb.ID != "" {
 			acc.add(fieldPath(i, "id"), "duplicate id "+strconv.Quote(rb.ID))
 		}
@@ -254,13 +265,14 @@ func Validate(raw Raw, opts Options) (Scenario, error) {
 		}
 	}
 
-	// Caps: map -> validate against the (divided) effective ceiling.
-	ceiling := safety.DefaultCeiling().DividedBy(agentCount)
-	declared := toCapSpec(raw.Caps)
-	for _, v := range safety.ValidateCaps(declared, ceiling, opts.CapOverride) {
-		acc.add("caps."+v.Field, v.Msg)
+	// Weighting strategy for the block mix (design §6.7). "" defaults to
+	// WeightByVuserPopulation; an unknown value is rejected.
+	weightBasis, wbOK := parseWeightBasis(raw.WeightBasis)
+	if !wbOK {
+		acc.add("weight_basis", "unknown weight_basis "+strconv.Quote(raw.WeightBasis)+" (allowed: vuser_population, concurrency, request_rate)")
 	}
-	caps := declared.Effective(ceiling)
+
+	schedule := validateSchedule(&acc, raw.Schedule)
 
 	if err := acc.result(); err != nil {
 		return Scenario{}, err
@@ -276,6 +288,8 @@ func Validate(raw Raw, opts Options) (Scenario, error) {
 		Execution:      Execution{Mode: mode, StopOnError: raw.Execution.StopOnError},
 		Blocks:         blocks,
 		Targets:        protocols.NewTargetSet(allTargets, raw.AllowedDomains),
+		WeightBasis:    weightBasis,
+		Schedule:       schedule,
 	}, nil
 }
 
@@ -320,7 +334,7 @@ func resolvePersonas(acc *errAccumulator, raws []persona.RawPersona) map[string]
 // validateBlock validates one RawBlock, appending any FieldErrors to acc, and
 // returns the typed Block (partial if invalid; the accumulated errors prevent
 // the partial result from ever being returned to the caller).
-func validateBlock(acc *errAccumulator, i int, rb RawBlock, opts Options, personas map[string]persona.Persona) Block {
+func validateBlock(acc *errAccumulator, i int, rb RawBlock, opts Options, personas map[string]persona.Persona, maxConcurrent int) Block {
 	b := Block{
 		ID:                  rb.ID,
 		AllowInsecure:       rb.AllowInsecure,
@@ -371,8 +385,162 @@ func validateBlock(acc *errAccumulator, i int, rb RawBlock, opts Options, person
 		acc.add(fieldPath(i, "persona"), "unknown persona "+strconv.Quote(name))
 	}
 
+	b.Concurrency, b.Duration, b.Weight = validateBlockLoad(acc, i, rb, maxConcurrent)
+	b.Ramp = validateRamp(acc, i, rb.Ramp, b.Concurrency, b.Duration)
+
 	validateInsecureGate(acc, i, rb, opts)
 	return b
+}
+
+// validateBlockLoad validates and builds the per-block load fields:
+// concurrency (defaults to 1; in [1, maxConcurrent]), duration_minutes
+// (required, >= 1), and weight (defaults to 1; >= 1). It appends ClassConfig
+// FieldErrors to acc and returns the built values (partial on error — the
+// accumulated errors prevent the partial result from reaching the caller).
+func validateBlockLoad(acc *errAccumulator, i int, rb RawBlock, maxConcurrent int) (int, time.Duration, uint) {
+	concurrency := rb.Concurrency
+	if concurrency == 0 {
+		concurrency = 1 // omitted concurrency defaults to a single vuser
+	}
+	if concurrency < 1 {
+		acc.add(fieldPath(i, "concurrency"), "must be >= 1")
+	} else if concurrency > maxConcurrent {
+		acc.add(fieldPath(i, "concurrency"),
+			"concurrency "+strconv.Itoa(concurrency)+" exceeds the effective max_concurrent_sessions cap of "+strconv.Itoa(maxConcurrent))
+	}
+
+	if rb.DurationMinutes < 1 {
+		acc.add(fieldPath(i, "duration_minutes"), "must be >= 1")
+	}
+	duration := time.Duration(rb.DurationMinutes) * time.Minute
+
+	weight := rb.Weight
+	if weight == 0 {
+		weight = 1 // omitted weight defaults to 1
+	}
+
+	return concurrency, duration, weight
+}
+
+// validateRamp validates and builds a block's RampPlan. A nil *RawRamp yields the
+// zero RampPlan (no ramp). up_seconds must be in [0, duration]; start_concurrency
+// defaults to concurrency (=> no ramp) and must be in [1, concurrency]. Errors are
+// ClassConfig FieldErrors appended to acc. The concurrency/duration bounds come
+// from the already-built block load fields (Task S4).
+func validateRamp(acc *errAccumulator, i int, rr *RawRamp, concurrency int, duration time.Duration) RampPlan {
+	if rr == nil {
+		return RampPlan{} // no ramp
+	}
+
+	up := time.Duration(rr.UpSeconds) * time.Second
+	if rr.UpSeconds < 0 {
+		acc.add(fieldPath(i, "ramp.up_seconds"), "must be >= 0")
+	} else if up > duration {
+		acc.add(fieldPath(i, "ramp.up_seconds"), "up_seconds must be <= the block duration")
+	}
+
+	start := rr.StartConcurrency
+	if start == 0 {
+		start = concurrency // omitted start_concurrency => start at full concurrency (no ramp)
+	}
+	if start < 1 || start > concurrency {
+		acc.add(fieldPath(i, "ramp.start_concurrency"),
+			"start_concurrency must be in 1.."+strconv.Itoa(concurrency))
+	}
+
+	return RampPlan{Up: up, StartConcurrency: start}
+}
+
+// weekdayByName maps lowercase weekday abbreviations to time.Weekday for the
+// schedule days allowlist (AGENTS.md §5.2: allowlist, not denylist).
+var weekdayByName = map[string]time.Weekday{
+	"sun": time.Sunday,
+	"mon": time.Monday,
+	"tue": time.Tuesday,
+	"wed": time.Wednesday,
+	"thu": time.Thursday,
+	"fri": time.Friday,
+	"sat": time.Saturday,
+}
+
+// validateSchedule validates and builds the scenario-level Schedule. A nil
+// *RawSchedule yields the empty always-active Schedule (design §5). The timezone
+// must load via time.LoadLocation; each window's days must be a non-empty subset
+// of the weekday allowlist; start/end must parse as HH:MM with end > start
+// (cross-midnight is rejected by that same check). Errors are ClassConfig.
+func validateSchedule(acc *errAccumulator, rs *RawSchedule) Schedule {
+	if rs == nil {
+		return Schedule{} // always active
+	}
+
+	loc, err := time.LoadLocation(rs.Timezone)
+	if err != nil {
+		acc.add("schedule.timezone", "failed to load timezone "+strconv.Quote(rs.Timezone))
+		loc = nil
+	}
+
+	windows := make([]ScheduleWindow, 0, len(rs.Windows))
+	for i, rw := range rs.Windows {
+		windows = append(windows, validateWindow(acc, i, rw))
+	}
+	return Schedule{Loc: loc, Windows: windows}
+}
+
+// validateWindow validates and builds one ScheduleWindow. It checks a non-empty
+// day allowlist, HH:MM parsing of start/end, and end > start. Field paths are
+// "schedule.windows[i].<sub>". Errors are ClassConfig appended to acc.
+func validateWindow(acc *errAccumulator, i int, rw RawWindow) ScheduleWindow {
+	var w ScheduleWindow
+
+	if len(rw.Days) == 0 {
+		acc.add(scheduleWindowPath(i, "days"), "at least one day is required")
+	}
+	for j, d := range rw.Days {
+		wd, ok := weekdayByName[strings.ToLower(strings.TrimSpace(d))]
+		if !ok {
+			acc.add(scheduleWindowPath(i, "days")+"["+strconv.Itoa(j)+"]", "unknown day "+strconv.Quote(d))
+			continue
+		}
+		w.Days[int(wd)] = true
+	}
+
+	start, startOK := parseHHMM(rw.Start)
+	if !startOK {
+		acc.add(scheduleWindowPath(i, "start"), "start must be HH:MM in 00:00..23:59")
+	}
+	end, endOK := parseHHMM(rw.End)
+	if !endOK {
+		acc.add(scheduleWindowPath(i, "end"), "end must be HH:MM in 00:00..23:59")
+	}
+	if startOK && endOK && end <= start {
+		// A cross-midnight window (end <= start after wrapping) is rejected in the
+		// MVP: split it into two windows (design §3.3).
+		acc.add(scheduleWindowPath(i, "end"), "end must be after start (no cross-midnight windows)")
+	}
+
+	w.Start, w.End = start, end
+	return w
+}
+
+// scheduleWindowPath renders the YAML path for the i-th schedule window's sub-key.
+func scheduleWindowPath(i int, sub string) string {
+	return "schedule.windows[" + strconv.Itoa(i) + "]." + sub
+}
+
+// parseHHMM parses an "HH:MM" 24-hour clock string into a since-midnight
+// time.Duration. ok is false for any malformed value or an out-of-range
+// hour (0..23) or minute (0..59).
+func parseHHMM(s string) (time.Duration, bool) {
+	parts := strings.Split(strings.TrimSpace(s), ":")
+	if len(parts) != 2 {
+		return 0, false
+	}
+	h, herr := strconv.Atoi(parts[0])
+	m, merr := strconv.Atoi(parts[1])
+	if herr != nil || merr != nil || h < 0 || h > 23 || m < 0 || m > 59 {
+		return 0, false
+	}
+	return time.Duration(h)*time.Hour + time.Duration(m)*time.Minute, true
 }
 
 // validateInsecureGate enforces D4: a block may declare allow_insecure only with

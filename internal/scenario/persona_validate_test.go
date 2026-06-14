@@ -11,7 +11,7 @@ func baseRaw() Raw {
 		Name:      "test",
 		Execution: RawExecution{Mode: "parallel"},
 		Scenarios: []RawBlock{
-			{ID: "b1", Protocol: "http", Targets: []string{"web.example.com:443"}, TargetRotation: "sequential"},
+			{ID: "b1", Protocol: "http", Targets: []string{"web.example.com:443"}, TargetRotation: "sequential", DurationMinutes: 5},
 		},
 	}
 }
