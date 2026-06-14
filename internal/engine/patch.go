@@ -13,6 +13,11 @@ import (
 	"github.com/Principe1218/phantomTraffic/internal/scenario"
 )
 
+const (
+	applyPatchOp = "Run.ApplyPatch"
+	targetsAddOp = "engine.patch.targets_add"
+)
+
 // MixWeights maps a block ID to its new relative weight. Re-normalized on apply;
 // takes effect at the next vuser recycle (foundation §6.7).
 type MixWeights map[string]uint
@@ -50,7 +55,7 @@ func (r *Run) ApplyPatch(_ context.Context, p ScenarioPatch) error {
 		if capsRaised(r.caps, next) {
 			if !r.capOverride {
 				return pterr.New(pterr.ClassConfig, "engine.patch.caps_up",
-					"Run.ApplyPatch", "raising a safety cap requires the cap-override flag")
+					applyPatchOp, "raising a safety cap requires the cap-override flag")
 			}
 			if err := r.audit.Append(audit.Event{
 				Actor:    r.AgentID(),
@@ -69,7 +74,7 @@ func (r *Run) ApplyPatch(_ context.Context, p ScenarioPatch) error {
 		n := *p.Concurrency
 		if n <= 0 {
 			return pterr.New(pterr.ClassConfig, "engine.patch.concurrency",
-				"Run.ApplyPatch", "concurrency must be >= 1")
+				applyPatchOp, "concurrency must be >= 1")
 		}
 		r.sem.setLimit(n)
 		detail["concurrency"] = strconv.Itoa(n)
@@ -88,7 +93,7 @@ func (r *Run) ApplyPatch(_ context.Context, p ScenarioPatch) error {
 		sec := *p.RotationIntSec
 		if sec < 0 {
 			return pterr.New(pterr.ClassConfig, "engine.patch.rotation",
-				"Run.ApplyPatch", "rotation interval seconds must be >= 0")
+				applyPatchOp, "rotation interval seconds must be >= 0")
 		}
 		r.selector.setInterval(time.Duration(sec) * time.Second)
 		detail["rotation_interval_sec"] = strconv.Itoa(sec)
@@ -97,20 +102,20 @@ func (r *Run) ApplyPatch(_ context.Context, p ScenarioPatch) error {
 	for _, spec := range p.TargetsAdd {
 		blk, ok := r.blockByID(spec.BlockID)
 		if !ok {
-			return pterr.New(pterr.ClassConfig, "engine.patch.targets_add",
-				"Run.ApplyPatch", "TargetsAdd references unknown block: "+spec.BlockID)
+			return pterr.New(pterr.ClassConfig, targetsAddOp,
+				applyPatchOp, "TargetsAdd references unknown block: "+spec.BlockID)
 		}
 		if err := structuralCheck(blk.Protocol, spec.Addr); err != nil {
 			return err
 		}
 		host, err := hostOf(spec.Addr)
 		if err != nil {
-			return pterr.New(pterr.ClassConfig, "engine.patch.targets_add",
-				"Run.ApplyPatch", "TargetsAdd invalid address: "+spec.Addr)
+			return pterr.New(pterr.ClassConfig, targetsAddOp,
+				applyPatchOp, "TargetsAdd invalid address: "+spec.Addr)
 		}
 		if !r.sc.Targets.Permits(host) {
-			return pterr.New(pterr.ClassConfig, "engine.patch.targets_add",
-				"Run.ApplyPatch", "TargetsAdd address not in allowed_domains: "+spec.Addr)
+			return pterr.New(pterr.ClassConfig, targetsAddOp,
+				applyPatchOp, "TargetsAdd address not in allowed_domains: "+spec.Addr)
 		}
 		tid := blk.ID + "/" + strconv.Itoa(len(blk.Targets)+r.addedTargets(blk.ID))
 		r.selector.addTarget(blk.Protocol, protocols.Target{ID: tid, Proto: blk.Protocol, Addr: spec.Addr})
@@ -123,7 +128,7 @@ func (r *Run) ApplyPatch(_ context.Context, p ScenarioPatch) error {
 		b, ok := r.breakers[tid]
 		if !ok {
 			return pterr.New(pterr.ClassConfig, "engine.patch.targets_disable",
-				"Run.ApplyPatch", "TargetsDisable references unknown target: "+tid)
+				applyPatchOp, "TargetsDisable references unknown target: "+tid)
 		}
 		b.ForceOpen()
 		detail["targets_disable"] = detail["targets_disable"] + tid + " "
@@ -160,11 +165,11 @@ func (r *Run) normalizeWeights(w MixWeights) (map[string]uint, error) {
 	for id, v := range w {
 		if !known[id] {
 			return nil, pterr.New(pterr.ClassConfig, "engine.patch.weights",
-				"Run.ApplyPatch", "weight references unknown block: "+id)
+				applyPatchOp, "weight references unknown block: "+id)
 		}
 		if v == 0 {
 			return nil, pterr.New(pterr.ClassConfig, "engine.patch.weights",
-				"Run.ApplyPatch", "weight must be >= 1 for block: "+id)
+				applyPatchOp, "weight must be >= 1 for block: "+id)
 		}
 		out[id] = v
 	}
@@ -236,7 +241,7 @@ func structuralCheck(proto protocols.ProtocolID, addr string) error {
 	u, err := url.Parse(addr)
 	if err != nil {
 		return pterr.New(pterr.ClassConfig, "engine.patch.structural",
-			"Run.ApplyPatch", "TargetsAdd invalid address: "+addr)
+			applyPatchOp, "TargetsAdd invalid address: "+addr)
 	}
 	if u.Scheme == "" {
 		return nil // bare host inherits block protocol
@@ -244,7 +249,7 @@ func structuralCheck(proto protocols.ProtocolID, addr string) error {
 	want := schemeFor(proto)
 	if u.Scheme != want {
 		return pterr.New(pterr.ClassConfig, "engine.patch.structural",
-			"Run.ApplyPatch",
+			applyPatchOp,
 			"TargetsAdd protocol scheme "+u.Scheme+" does not match block protocol "+string(proto))
 	}
 	return nil

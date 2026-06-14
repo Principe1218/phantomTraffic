@@ -16,6 +16,7 @@ import (
 const (
 	defaultStatsInterval = time.Second
 	defaultGraceTimeout  = 30 * time.Second
+	engineOptions        = "engine.options"
 )
 
 // Options carries every dependency Engine needs. Required deps are validated by
@@ -48,17 +49,17 @@ func New(opts Options) (*Engine, error) {
 	const op = "engine.New"
 	switch {
 	case opts.Clock == nil:
-		return nil, pterr.New(pterr.ClassConfig, "engine.options", op, "Clock is required")
+		return nil, pterr.New(pterr.ClassConfig, engineOptions, op, "Clock is required")
 	case opts.Rand == nil:
-		return nil, pterr.New(pterr.ClassConfig, "engine.options", op, "Rand is required")
+		return nil, pterr.New(pterr.ClassConfig, engineOptions, op, "Rand is required")
 	case opts.Registry == nil:
-		return nil, pterr.New(pterr.ClassConfig, "engine.options", op, "Registry is required")
+		return nil, pterr.New(pterr.ClassConfig, engineOptions, op, "Registry is required")
 	case opts.SessionMaker == nil:
-		return nil, pterr.New(pterr.ClassConfig, "engine.options", op, "SessionMaker is required")
+		return nil, pterr.New(pterr.ClassConfig, engineOptions, op, "SessionMaker is required")
 	case opts.Audit == nil:
-		return nil, pterr.New(pterr.ClassConfig, "engine.options", op, "Audit is required")
+		return nil, pterr.New(pterr.ClassConfig, engineOptions, op, "Audit is required")
 	case opts.AgentID == "":
-		return nil, pterr.New(pterr.ClassConfig, "engine.options", op, "AgentID is required")
+		return nil, pterr.New(pterr.ClassConfig, engineOptions, op, "AgentID is required")
 	}
 
 	if opts.Logger == nil {
