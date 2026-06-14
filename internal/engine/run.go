@@ -48,7 +48,6 @@ func (e *Engine) Start(ctx context.Context, sc scenario.Scenario) (*Run, error) 
 		audit:       e.opts.Audit,
 		engine:      e,
 		sc:          sc,
-		runCtx:      runCtx,
 		cancel:      cancel,
 		gate:        newGate(e.opts.Clock),
 		coll:        coll,
@@ -67,13 +66,13 @@ func (e *Engine) Start(ctx context.Context, sc scenario.Scenario) (*Run, error) 
 		return nil, pterr.Wrap(pterr.ClassPermanent, "engine.state", op, "enter running", err)
 	}
 
-	r.startSupervisor()
+	r.startSupervisor(runCtx)
 	return r, nil
 }
 
 // startSupervisor spawns the supervisor goroutine tree. Each goroutine is tracked
 // by r.wg so Stop()/completion can drain them.
-func (r *Run) startSupervisor() {
+func (r *Run) startSupervisor(ctx context.Context) {
 	remaining := len(r.sc.Blocks)
 	r.blocksLeft.Store(int64(remaining))
 
@@ -84,26 +83,26 @@ func (r *Run) startSupervisor() {
 
 	for i := range r.sc.Blocks {
 		block := r.sc.Blocks[i]
-		r.startBlock(block)
+		r.startBlock(ctx, block)
 	}
 
 	if len(r.sc.Schedule.Windows) > 0 {
 		r.wg.Add(1)
 		go func() {
 			defer r.wg.Done()
-			r.runScheduler()
+			r.runScheduler(ctx)
 		}()
 	}
 
 	r.wg.Add(1)
 	go func() {
 		defer r.wg.Done()
-		r.runStatsCollector()
+		r.runStatsCollector(ctx)
 	}()
 }
 
 // startBlock spawns the per-block vuser pool, ramp governor, and completion timer.
-func (r *Run) startBlock(block scenario.Block) {
+func (r *Run) startBlock(ctx context.Context, block scenario.Block) {
 	sem := newSemaphore(initialLimit(block))
 	sel := r.newSelectorFor(block)
 
@@ -115,7 +114,7 @@ func (r *Run) startBlock(block scenario.Block) {
 	}
 	r.mu.Unlock()
 	for v := 0; v < block.Concurrency; v++ {
-		vsess, sess, ok := r.buildSession(block, sel)
+		vsess, sess, ok := r.buildSession(ctx, block, sel)
 		if !ok {
 			continue
 		}
@@ -125,14 +124,14 @@ func (r *Run) startBlock(block scenario.Block) {
 		r.wg.Add(1)
 		go func() {
 			defer r.wg.Done()
-			runWorker(r.runCtx, sess, vsess, deps)
+			runWorker(ctx, sess, vsess, deps)
 		}()
 	}
 
 	r.wg.Add(1)
 	go func() {
 		defer r.wg.Done()
-		r.runRampGovernor(block, sem)
+		r.runRampGovernor(ctx, block, sem)
 	}()
 
 	// Gate-aware completion: accumulates only active (un-paused) elapsed time so
@@ -140,7 +139,7 @@ func (r *Run) startBlock(block scenario.Block) {
 	r.wg.Add(1)
 	go func() {
 		defer r.wg.Done()
-		r.runBlockDuration(block)
+		r.runBlockDuration(ctx, block)
 	}()
 }
 
@@ -150,10 +149,10 @@ func (r *Run) startBlock(block scenario.Block) {
 // the operator-pause timer shift (design §6.4): time spent paused is not counted.
 // complete() is called in a separate goroutine to avoid deadlocking on r.wg.Wait
 // (this goroutine is itself tracked by r.wg).
-func (r *Run) runBlockDuration(block scenario.Block) {
+func (r *Run) runBlockDuration(ctx context.Context, block scenario.Block) {
 	var elapsed time.Duration
 	for elapsed < block.Duration {
-		closedCh, err := r.gate.waitOpenAndGetCloseCh(r.runCtx)
+		closedCh, err := r.gate.waitOpenAndGetCloseCh(ctx)
 		if err != nil {
 			return
 		}
@@ -161,7 +160,7 @@ func (r *Run) runBlockDuration(block scenario.Block) {
 		remaining := block.Duration - elapsed
 		timer := r.clk.NewTimer(remaining)
 		select {
-		case <-r.runCtx.Done():
+		case <-ctx.Done():
 			timer.Stop()
 			return
 		case <-closedCh:
@@ -291,7 +290,7 @@ func (r *Run) newSelectorFor(block scenario.Block) *rotatingSelector {
 func (r *Run) Snapshot() StatsSnapshot { return r.coll.snapshot() }
 
 // buildSession assembles a behavior.Session for one vuser.
-func (r *Run) buildSession(block scenario.Block, sel behavior.TargetSelector) (behavior.Session, *protocols.Session, bool) {
+func (r *Run) buildSession(ctx context.Context, block scenario.Block, sel behavior.TargetSelector) (behavior.Session, *protocols.Session, bool) {
 	sid, err := idgen.SessionID()
 	if err != nil {
 		return nil, nil, false
@@ -311,7 +310,7 @@ func (r *Run) buildSession(block scenario.Block, sel behavior.TargetSelector) (b
 		Deps:    deps,
 	}
 	spec := block.Persona.ToSpec(sel)
-	vsess, err := r.engine.opts.SessionMaker.NewSession(r.runCtx, spec, deps)
+	vsess, err := r.engine.opts.SessionMaker.NewSession(ctx, spec, deps)
 	if err != nil {
 		return nil, nil, false
 	}
@@ -339,7 +338,7 @@ func (r *Run) workerDeps(sem *semaphore) workerDeps {
 }
 
 // runRampGovernor ticks on the clock and resizes the semaphore to concurrencyAt.
-func (r *Run) runRampGovernor(block scenario.Block, sem *semaphore) {
+func (r *Run) runRampGovernor(ctx context.Context, block scenario.Block, sem *semaphore) {
 	if block.Ramp.Up <= 0 {
 		return // no ramp: initial limit is already the target
 	}
@@ -348,7 +347,7 @@ func (r *Run) runRampGovernor(block scenario.Block, sem *semaphore) {
 	defer timer.Stop()
 	for {
 		select {
-		case <-r.runCtx.Done():
+		case <-ctx.Done():
 			return
 		case <-timer.C():
 			elapsed := r.clk.Since(start)
@@ -363,7 +362,7 @@ func (r *Run) runRampGovernor(block scenario.Block, sem *semaphore) {
 }
 
 // runScheduler pauses/resumes the schedule gate source on each active<->inactive edge.
-func (r *Run) runScheduler() {
+func (r *Run) runScheduler(ctx context.Context) {
 	for {
 		now := r.clk.Now()
 		if schedule.Active(r.sc.Schedule, now) {
@@ -380,19 +379,19 @@ func (r *Run) runScheduler() {
 		if d <= 0 {
 			d = time.Nanosecond
 		}
-		if err := r.clk.Sleep(r.runCtx, d); err != nil {
+		if err := r.clk.Sleep(ctx, d); err != nil {
 			return // run ctx canceled
 		}
 	}
 }
 
 // runStatsCollector publishes a snapshot on each clock tick.
-func (r *Run) runStatsCollector() {
+func (r *Run) runStatsCollector(ctx context.Context) {
 	timer := r.clk.NewTimer(r.engine.opts.StatsInterval)
 	defer timer.Stop()
 	for {
 		select {
-		case <-r.runCtx.Done():
+		case <-ctx.Done():
 			r.pub.publish(r.coll.snapshot())
 			return
 		case <-timer.C():

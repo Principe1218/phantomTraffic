@@ -112,7 +112,6 @@ type Run struct {
 	engine  *Engine
 	sc      scenario.Scenario
 
-	runCtx context.Context //nolint:containedctx
 	cancel context.CancelFunc
 
 	gate     *gate

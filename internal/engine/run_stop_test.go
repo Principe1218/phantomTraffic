@@ -40,14 +40,15 @@ func TestStopCancelsRunCtx(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Start: %v", err)
 	}
-	ctxBefore := run.runCtx
 	if err := run.Stop(context.Background()); err != nil {
 		t.Fatalf("Stop: %v", err)
 	}
+	// Stop must have canceled the internal run context, which causes all
+	// goroutines to exit and closes the done channel before Stop returns.
 	select {
-	case <-ctxBefore.Done():
+	case <-run.Wait():
 	default:
-		t.Error("runCtx not canceled after Stop")
+		t.Error("run not done after Stop — internal context was not canceled")
 	}
 }
 
