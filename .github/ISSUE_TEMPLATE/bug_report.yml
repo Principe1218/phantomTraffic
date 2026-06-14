@@ -1,4 +1,4 @@
-name: Bug report template
+name: Bug report
 description: Report a problem with PhantomTraffic
 title: "[Bug]: "
 labels: ["bug"]
