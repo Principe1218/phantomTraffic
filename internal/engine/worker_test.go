@@ -78,17 +78,17 @@ type fakeHandler struct {
 	panicOnCall int
 }
 
-func (fakeHandler) ID() protocols.ProtocolID { return testProto }
-func (fakeHandler) Capability() protocols.Capability {
+func (*fakeHandler) ID() protocols.ProtocolID { return testProto }
+func (*fakeHandler) Capability() protocols.Capability {
 	return protocols.Capability{Proto: testProto, Actions: []protocols.ActionKind{"ping"}}
 }
 
-func (fakeHandler) OpenState(ctx context.Context, _ *protocols.Session) (protocols.SessionState, error) {
+func (*fakeHandler) OpenState(ctx context.Context, _ *protocols.Session) (protocols.SessionState, error) {
 	// SessionState is sealed to package protocols; runAction never calls OpenState,
 	// so nil is safe for worker tests.
 	return nil, ctx.Err()
 }
-func (fakeHandler) CloseState(context.Context, protocols.SessionState) error { return nil }
+func (*fakeHandler) CloseState(context.Context, protocols.SessionState) error { return nil }
 
 func (h *fakeHandler) Do(ctx context.Context, _ *protocols.Session, _ protocols.Action) (protocols.Result, protocols.Observation, error) {
 	h.mu.Lock()
