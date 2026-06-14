@@ -53,7 +53,7 @@ func TestBuiltinToSpecRunsASession(t *testing.T) {
 		Clock: clock.NewFake(time.Date(2026, 1, 5, 10, 0, 0, 0, time.UTC)),
 		Rand:  rng.New(1, 2),
 	}
-	s, err := behavior.NewSessionFactory().NewSession(context.Background(), p.ToSpec(sel), deps)
+	s, err := behavior.NewSessionMaker().NewSession(context.Background(), p.ToSpec(sel), deps)
 	if err != nil {
 		t.Fatalf("NewSession: %v", err)
 	}

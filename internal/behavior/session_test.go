@@ -34,7 +34,7 @@ func newTestSession(t *testing.T, spec SessionSpec, script rng.FakeScript) (Sess
 	t.Helper()
 	fc := clock.NewFake(sessBase)
 	deps := protocols.SessionDeps{Clock: fc, Rand: rng.NewFake(script)}
-	s, err := NewSessionFactory().NewSession(context.Background(), spec, deps)
+	s, err := NewSessionMaker().NewSession(context.Background(), spec, deps)
 	if err != nil {
 		t.Fatalf("NewSession: %v", err)
 	}
@@ -140,11 +140,11 @@ func TestSessionObserveDrivesPriorReactiveThink(t *testing.T) {
 
 func TestNewSessionRequiresSelectorAndDeps(t *testing.T) {
 	good := protocols.SessionDeps{Clock: clock.NewFake(sessBase), Rand: rng.NewFake(rng.FakeScript{})}
-	if _, err := NewSessionFactory().NewSession(context.Background(), SessionSpec{Mix: httpMix(t)}, good); err == nil {
+	if _, err := NewSessionMaker().NewSession(context.Background(), SessionSpec{Mix: httpMix(t)}, good); err == nil {
 		t.Fatal("expected error when Selector is nil")
 	}
 	spec := SessionSpec{Mix: httpMix(t), Selector: oneHTTPSelector()}
-	if _, err := NewSessionFactory().NewSession(context.Background(), spec, protocols.SessionDeps{}); err == nil {
+	if _, err := NewSessionMaker().NewSession(context.Background(), spec, protocols.SessionDeps{}); err == nil {
 		t.Fatal("expected error when Clock/Rand are nil")
 	}
 }
@@ -155,7 +155,7 @@ func TestNewSessionRequiresNonEmptyMix(t *testing.T) {
 		Selector: oneHTTPSelector(),
 	}
 	deps := protocols.SessionDeps{Clock: clock.NewFake(sessBase), Rand: rng.NewFake(rng.FakeScript{})}
-	_, err := NewSessionFactory().NewSession(context.Background(), spec, deps)
+	_, err := NewSessionMaker().NewSession(context.Background(), spec, deps)
 	if err == nil {
 		t.Fatal("expected error when Mix is empty")
 	}

@@ -50,12 +50,12 @@ type Session interface {
 	Bounds() BranchBounds
 }
 
-// SessionFactory builds Sessions from a SessionSpec + injected deps.
-type SessionFactory interface {
+// SessionMaker builds Sessions from a SessionSpec + injected deps.
+type SessionMaker interface {
 	NewSession(ctx context.Context, spec SessionSpec, deps protocols.SessionDeps) (Session, error)
 }
 
-// SessionSpec is the decomposed persona bundle the factory needs (NOT a
+// SessionSpec is the decomposed persona bundle the sessionMaker needs (NOT a
 // persona.Persona — that would create a behavior<->persona import cycle).
 // internal/persona builds this via Persona.ToSpec.
 type SessionSpec struct {
@@ -70,12 +70,12 @@ type SessionSpec struct {
 	Selector  TargetSelector
 }
 
-type factory struct{}
+type sessionMaker struct{}
 
-// NewSessionFactory returns the default SessionFactory.
-func NewSessionFactory() SessionFactory { return factory{} }
+// NewSessionMaker returns the default SessionMaker.
+func NewSessionMaker() SessionMaker { return sessionMaker{} }
 
-func (factory) NewSession(_ context.Context, spec SessionSpec, deps protocols.SessionDeps) (Session, error) {
+func (sessionMaker) NewSession(_ context.Context, spec SessionSpec, deps protocols.SessionDeps) (Session, error) {
 	if spec.Mix.Len() == 0 {
 		return nil, fmt.Errorf("behavior: SessionSpec.Mix must be non-empty")
 	}

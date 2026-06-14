@@ -21,7 +21,7 @@ type Persona struct {
 	Bounds    behavior.BranchBounds
 }
 
-// ToSpec decomposes the persona into a behavior.SessionSpec for the factory. The
+// ToSpec decomposes the persona into a behavior.SessionSpec for the maker. The
 // caller supplies the TargetSelector (which encodes the scenario's targets +
 // rotation policy — the engine in Plan 4, or a behavior.RoundRobinSelector in
 // tests).

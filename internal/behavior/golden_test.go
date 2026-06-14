@@ -48,7 +48,7 @@ func runSession(t *testing.T, spec SessionSpec, script rng.FakeScript, n int) []
 	t.Helper()
 	fc := clock.NewFake(sessBase)
 	deps := protocols.SessionDeps{Clock: fc, Rand: rng.NewFake(script)}
-	s, err := NewSessionFactory().NewSession(context.Background(), spec, deps)
+	s, err := NewSessionMaker().NewSession(context.Background(), spec, deps)
 	if err != nil {
 		t.Fatal(err)
 	}
