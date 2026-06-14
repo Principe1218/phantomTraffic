@@ -35,6 +35,7 @@ scenarios:
     targets:
       - example.com:443
     target_rotation: sequential
+    duration_minutes: 5
 `
 
 func TestRunValidate_HappyPath_Human(t *testing.T) {
@@ -268,6 +269,7 @@ scenarios:
       - internal.test:8443
     allow_insecure: true
     allow_insecure_reason: "legacy appliance has a self-signed cert, lab only"
+    duration_minutes: 5
 `
 
 func TestRunValidate_InsecureGate_RejectedWithoutFlag(t *testing.T) {
