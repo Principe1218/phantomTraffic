@@ -12,7 +12,7 @@ import (
 //	exp   = min(max, base << attempt)   // capped exponential
 //	delay = Duration(r.Float64() * exp) // full jitter in [0, exp)
 //
-// Full jitter (rather than equal jitter) maximizes decorrelation of concurrent
+// Full jitter (rather than equal jitter) maximizes de-correlation of concurrent
 // retriers so backoff never synchronizes into a thundering herd. The randomness
 // comes from the injected rng.Rand — never math/rand (AGENTS.md §2.2).
 func backoffDelay(attempt int, base, max time.Duration, r rng.Rand) time.Duration {
