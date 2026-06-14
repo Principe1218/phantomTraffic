@@ -2,6 +2,7 @@ package engine
 
 import (
 	"math"
+	"sync/atomic"
 	"time"
 )
 
@@ -31,11 +32,11 @@ var histBuckets = [...]time.Duration{
 }
 
 // histogram is a fixed-bucket, mergeable latency histogram. The zero value is
-// ready to use. It is single-writer on the hot path (one per stats shard) and is
-// merged read-only on snapshot. len(counts) == len(histBuckets)+1 (the last slot
-// is the overflow bucket for samples above the final boundary).
+// ready to use. Counts are atomic.Uint64 so multiple worker goroutines may call
+// record() concurrently and snapshot() may call merge() concurrently with them.
+// len(counts) == len(histBuckets)+1 (the last slot is the overflow bucket).
 type histogram struct {
-	counts [len(histBuckets) + 1]uint64
+	counts [len(histBuckets) + 1]atomic.Uint64
 }
 
 // record adds one sample. Negative durations are clamped to zero.
@@ -45,17 +46,17 @@ func (h *histogram) record(d time.Duration) {
 	}
 	for i, b := range histBuckets {
 		if d <= b {
-			h.counts[i]++
+			h.counts[i].Add(1)
 			return
 		}
 	}
-	h.counts[len(histBuckets)]++ // overflow bucket
+	h.counts[len(histBuckets)].Add(1) // overflow bucket
 }
 
 // merge folds src into h without mutating src.
 func (h *histogram) merge(src *histogram) {
 	for i := range h.counts {
-		h.counts[i] += src.counts[i]
+		h.counts[i].Add(src.counts[i].Load())
 	}
 }
 
@@ -71,8 +72,8 @@ func (h *histogram) percentile(q float64) time.Duration {
 		q = 1
 	}
 	var total uint64
-	for _, c := range h.counts {
-		total += c
+	for i := range h.counts {
+		total += h.counts[i].Load()
 	}
 	if total == 0 {
 		return 0
@@ -83,8 +84,8 @@ func (h *histogram) percentile(q float64) time.Duration {
 	// 100th sample is exactly at the boundary, so ceil pushes rank past it.
 	rank := uint64(math.Ceil(q * float64(total)))
 	var cum uint64
-	for i, c := range h.counts {
-		cum += c
+	for i := range h.counts {
+		cum += h.counts[i].Load()
 		if cum > rank {
 			if i < len(histBuckets) {
 				return histBuckets[i]

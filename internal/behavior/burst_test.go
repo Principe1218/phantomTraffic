@@ -43,3 +43,33 @@ func TestAlwaysActiveNeverIdles(t *testing.T) {
 		t.Fatalf("name = %q", (AlwaysActive{}).Name())
 	}
 }
+
+func TestRenewalBurstCloneIsIndependent(t *testing.T) {
+	r := rng.NewFake(rng.FakeScript{})
+	b := NewRenewalBurst(Constant{D: 100 * time.Millisecond}, Constant{D: 500 * time.Millisecond})
+	c := b.Clone()
+
+	// Drive original past its active window into an idle trough.
+	b.Phase(base, r)
+	b.Phase(base.Add(100*time.Millisecond), r)
+
+	// Clone must start fresh: first Phase call is always active, never idle.
+	if ph := c.Phase(base, r); ph.Idle {
+		t.Fatal("Clone shares state with original: got idle on first call, want active")
+	}
+	if c.Name() != "renewal" {
+		t.Fatalf("Clone().Name() = %q, want renewal", c.Name())
+	}
+}
+
+func TestAlwaysActiveClone(t *testing.T) {
+	c := (AlwaysActive{}).Clone()
+	if c.Name() != "always-active" {
+		t.Fatalf("Clone().Name() = %q, want always-active", c.Name())
+	}
+	// Must still be stateless: never idles.
+	r := rng.NewFake(rng.FakeScript{})
+	if ph := c.Phase(base, r); ph.Idle {
+		t.Fatal("cloned AlwaysActive must never idle")
+	}
+}

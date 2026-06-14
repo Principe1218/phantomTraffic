@@ -28,7 +28,8 @@ func (s *scriptBurst) Phase(time.Time, rng.Rand) BurstPhase {
 	s.i++
 	return p
 }
-func (s *scriptBurst) Name() string { return "script" }
+func (s *scriptBurst) Name() string    { return "script" }
+func (s *scriptBurst) Clone() BurstModel { return &scriptBurst{phases: s.phases} }
 
 func navCtx(base time.Duration, prior *protocols.Result, r rng.Rand) ShapeCtx {
 	return ShapeCtx{Now: baseTime, Think: func() time.Duration { return base }, Cause: protocols.CauseNavigation, Prior: prior, Rand: r}
