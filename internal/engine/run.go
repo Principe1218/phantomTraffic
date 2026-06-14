@@ -75,7 +75,7 @@ func (e *Engine) Start(ctx context.Context, sc scenario.Scenario) (*Run, error) 
 // by r.wg so Stop()/completion can drain them.
 func (r *Run) startSupervisor() {
 	remaining := len(r.sc.Blocks)
-	r.blocksLeft.Store(int32(remaining))
+	r.blocksLeft.Store(int64(remaining))
 
 	r.weights = make(map[string]uint, len(r.sc.Blocks))
 	for _, b := range r.sc.Blocks {

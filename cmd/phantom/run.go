@@ -108,7 +108,7 @@ func runRun(args []string, stdout, stderr io.Writer) int {
 	// the forbidigo time.Now boundary is not crossed inside the package.
 	r := rng.New(
 		uint64(time.Now().UnixNano()),
-		uint64(os.Getpid())*0x9e3779b97f4a7c15,
+		uint64(uint(os.Getpid()))*0x9e3779b97f4a7c15,
 	)
 
 	e, err := engine.New(engine.Options{

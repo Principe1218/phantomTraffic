@@ -1,6 +1,7 @@
 package schedule_test
 
 import (
+	"go/ast"
 	"go/doc"
 	"go/parser"
 	"go/token"
@@ -12,24 +13,15 @@ import (
 // non-empty package-level doc string mentioning the on/off window evaluator.
 func TestPackageHasDocComment(t *testing.T) {
 	fset := token.NewFileSet()
-	pkgs, err := parser.ParseDir(fset, ".", nil, parser.ParseComments)
+	f, err := parser.ParseFile(fset, "doc.go", nil, parser.ParseComments)
 	if err != nil {
-		t.Fatalf("parse dir: %v", err)
+		t.Fatalf("parse doc.go: %v", err)
 	}
-	pkg, ok := pkgs["schedule"]
-	if !ok {
-		t.Fatalf("package schedule not found in current dir; got %v", keys(pkgs))
+	d, err := doc.NewFromFiles(fset, []*ast.File{f}, "github.com/Principe1218/phantomTraffic/internal/schedule")
+	if err != nil {
+		t.Fatalf("doc.NewFromFiles: %v", err)
 	}
-	d := doc.New(pkg, "github.com/Principe1218/phantomTraffic/internal/schedule", 0)
 	if d.Doc == "" {
 		t.Fatal("package schedule has no doc comment; add one in doc.go")
 	}
-}
-
-func keys[V any](m map[string]V) []string {
-	out := make([]string, 0, len(m))
-	for k := range m {
-		out = append(out, k)
-	}
-	return out
 }

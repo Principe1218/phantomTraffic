@@ -136,7 +136,7 @@ type Run struct {
 	selector    *rotatingSelector // first block's selector; set by startBlock
 
 	wg         sync.WaitGroup
-	blocksLeft atomic.Int32
+	blocksLeft atomic.Int64
 
 	state    atomic.Int32
 	transMu  sync.Mutex
