@@ -14,13 +14,14 @@ type Shaper interface {
 	Shape(ShapeCtx) ShapeDecision
 }
 
-// ShapeCtx is the per-step input. BaseThink is sampled from the persona's
-// ThinkTime by the Session; Prior is the previous action's scrubbed Result (nil
-// on the first step) for closed-loop reactive think-time.
+// ShapeCtx is the per-step input. Think is called lazily — only when the burst
+// model is active — so an idle trough never consumes a think-time draw. Prior is
+// the previous action's scrubbed Result (nil on the first step) for closed-loop
+// reactive think-time. Think may be nil for CauseControl/CauseSubResource.
 type ShapeCtx struct {
 	Now       time.Time
 	StepIndex int
-	BaseThink time.Duration
+	Think     func() time.Duration
 	Cause     protocols.Cause
 	Prior     *protocols.Result
 	Rand      rng.Rand
@@ -77,11 +78,12 @@ func (c *chainShaper) Shape(ctx ShapeCtx) ShapeDecision {
 		return ShapeDecision{Wait: clampNonNeg(w)}
 	}
 	// CauseNavigation (and CauseBackground, which the Session paces separately but
-	// shapes the same way): the full human pipeline.
-	wait := c.jitter.Jitter(ctx.BaseThink, ctx.Rand) // think-time -> jitter
+	// shapes the same way): the full human pipeline. Burst is checked before the
+	// think-time draw so an idle trough never wastes an RNG sample.
 	if ph := c.burst.Phase(ctx.Now, ctx.Rand); ph.Idle {
 		return ShapeDecision{Wait: ph.IdleFor, Idle: true} // burst trough
 	}
+	wait := c.jitter.Jitter(ctx.Think(), ctx.Rand) // think-time -> jitter
 	if intensity := c.tod.Intensity(ctx.Now); intensity > 0 {
 		wait = time.Duration(float64(wait) / intensity) // quiet hours stretch waits
 	}

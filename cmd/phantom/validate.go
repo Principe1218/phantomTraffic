@@ -9,6 +9,7 @@ import (
 	"os"
 
 	"github.com/Principe1218/phantomTraffic/internal/protocols"
+	"github.com/Principe1218/phantomTraffic/internal/pterr"
 	"github.com/Principe1218/phantomTraffic/internal/scenario"
 )
 
@@ -63,7 +64,7 @@ func runValidate(args []string, stdout, stderr io.Writer) int {
 		AgentCount:    *agentCount,
 	})
 	if err != nil {
-		var verrs scenario.ValidationErrors
+		var verrs pterr.FieldErrors
 		if errors.As(err, &verrs) {
 			return renderValidationErrors(file, verrs, *asJSON, stdout, stderr)
 		}
@@ -108,7 +109,7 @@ func renderSuccess(file string, scn scenario.Scenario, asJSON bool, stdout io.Wr
 // renderValidationErrors lists each field error on stderr (human) or emits a
 // JSON document on stdout, and returns exit code 1. Messages are the
 // redaction-safe FieldError.Msg values (AGENTS.md §5.5) — no internals.
-func renderValidationErrors(file string, verrs scenario.ValidationErrors, asJSON bool, stdout, stderr io.Writer) int {
+func renderValidationErrors(file string, verrs pterr.FieldErrors, asJSON bool, stdout, stderr io.Writer) int {
 	if asJSON {
 		reps := make([]fieldReport, 0, len(verrs))
 		for _, fe := range verrs {

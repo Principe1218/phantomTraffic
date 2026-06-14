@@ -9,6 +9,7 @@ import (
 
 	"github.com/Principe1218/phantomTraffic/internal/persona"
 	"github.com/Principe1218/phantomTraffic/internal/protocols"
+	"github.com/Principe1218/phantomTraffic/internal/pterr"
 	"github.com/Principe1218/phantomTraffic/internal/safety"
 )
 
@@ -28,15 +29,15 @@ type Options struct {
 	AgentCount    int
 }
 
-// errAccumulator gathers every FieldError in discovery order so Validate can
-// report ALL problems in one pass instead of failing on the first.
+// errAccumulator gathers every pterr.FieldError in discovery order so Validate
+// can report ALL problems in one pass instead of failing on the first.
 type errAccumulator struct {
-	errs ValidationErrors
+	errs pterr.FieldErrors
 }
 
 // add appends one field problem.
 func (a *errAccumulator) add(field, msg string) {
-	a.errs = append(a.errs, FieldError{Field: field, Msg: msg})
+	a.errs = append(a.errs, pterr.FieldError{Field: field, Msg: msg})
 }
 
 // result returns the aggregated errors as a non-nil error if any exist, else
@@ -301,7 +302,7 @@ func resolvePersonas(acc *errAccumulator, raws []persona.RawPersona) map[string]
 	for i, rp := range raws {
 		p, cerr := persona.Compile(rp)
 		if cerr != nil {
-			var pe persona.Errors
+			var pe pterr.FieldErrors
 			if errors.As(cerr, &pe) {
 				for _, fe := range pe {
 					acc.add("personas["+strconv.Itoa(i)+"]."+fe.Field, fe.Msg)

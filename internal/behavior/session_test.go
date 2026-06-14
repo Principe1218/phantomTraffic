@@ -149,6 +149,40 @@ func TestNewSessionRequiresSelectorAndDeps(t *testing.T) {
 	}
 }
 
+func TestNewSessionNilThinkTimeFallsBackToZero(t *testing.T) {
+	spec := SessionSpec{
+		// ThinkTime deliberately omitted -> falls back to Constant{} (zero duration)
+		Mix: httpMix(t), Selector: oneHTTPSelector(),
+		Burst: AlwaysActive{}, TimeOfDay: FlatTimeOfDay{}, Bounds: DefaultBranchBounds(),
+	}
+	deps := protocols.SessionDeps{Clock: clock.NewFake(sessBase), Rand: rng.NewFake(rng.FakeScript{Floats: []float64{0.5}})}
+	s, err := NewSessionMaker().NewSession(context.Background(), spec, deps)
+	if err != nil {
+		t.Fatalf("NewSession with nil ThinkTime: %v", err)
+	}
+	step, err := s.Next(context.Background())
+	if err != nil || step.Action == nil {
+		t.Fatalf("expected action step, got step=%+v err=%v", step, err)
+	}
+	if step.Wait != 0 {
+		t.Fatalf("zero think-time must produce Wait=0, got %v", step.Wait)
+	}
+}
+
+func TestNextReturnsCanceledContextError(t *testing.T) {
+	spec := SessionSpec{
+		Mix: httpMix(t), ThinkTime: Constant{D: time.Second},
+		Jitter: NoJitter{}, Burst: AlwaysActive{}, TimeOfDay: FlatTimeOfDay{},
+		Bounds: DefaultBranchBounds(), Selector: oneHTTPSelector(),
+	}
+	s, _ := newTestSession(t, spec, rng.FakeScript{})
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	if _, err := s.Next(ctx); err == nil {
+		t.Fatal("expected error from canceled context")
+	}
+}
+
 func TestNewSessionRequiresNonEmptyMix(t *testing.T) {
 	spec := SessionSpec{
 		// zero-value TemplateMix — Len() == 0

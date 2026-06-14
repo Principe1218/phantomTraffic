@@ -151,11 +151,10 @@ func (s *session) Next(ctx context.Context) (Step, error) {
 		return Step{Wait: 0}, nil // benign skip: persona weighted an untargeted protocol
 	}
 
-	base := s.think.Sample(s.rand)
 	dec := s.shaper.Shape(ShapeCtx{
 		Now:       now,
 		StepIndex: s.step,
-		BaseThink: base,
+		Think:     func() time.Duration { return s.think.Sample(s.rand) },
 		Cause:     tmpl.Cause,
 		Prior:     s.last,
 		Rand:      s.rand,

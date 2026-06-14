@@ -3,6 +3,8 @@ package persona
 import (
 	"errors"
 	"testing"
+
+	"github.com/Principe1218/phantomTraffic/internal/pterr"
 )
 
 func validRawPersona() RawPersona {
@@ -49,6 +51,9 @@ func TestCompileErrors(t *testing.T) {
 		{"bad curve length", mut(func(r *RawPersona) {
 			r.TimeOfDay = RawCurve{Location: "UTC", Weekday: make([]float64, 23), Weekend: make([]float64, 24)}
 		})},
+		{"curve missing location", mut(func(r *RawPersona) {
+			r.TimeOfDay = RawCurve{Weekday: make([]float64, 24), Weekend: make([]float64, 24)}
+		})},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -70,6 +75,9 @@ func TestCompileRejectsBadDistParams(t *testing.T) {
 		})},
 		{"uniform max less than min", mut(func(r *RawPersona) {
 			r.ThinkTime = RawDist{Kind: "uniform", Min: "5s", Max: "1s"}
+		})},
+		{"negative normal mean", mut(func(r *RawPersona) {
+			r.ThinkTime = RawDist{Kind: "normal", Mean: "-1s", StdDev: "0s", Min: "0s", Max: "10s"}
 		})},
 		{"negative normal stddev", mut(func(r *RawPersona) {
 			r.ThinkTime = RawDist{Kind: "normal", Mean: "5s", StdDev: "-1s", Min: "0s", Max: "10s"}
@@ -98,7 +106,7 @@ func TestCompileAggregatesMultipleErrors(t *testing.T) {
 	if err == nil {
 		t.Fatal("expected errors")
 	}
-	var es Errors
+	var es pterr.FieldErrors
 	if !errors.As(err, &es) || len(es) < 2 {
 		t.Fatalf("expected >=2 aggregated field errors, got %v", err)
 	}

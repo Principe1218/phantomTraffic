@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"strconv"
 	"strings"
+	"sync"
 
 	"github.com/Principe1218/phantomTraffic/internal/rng"
 )
@@ -39,13 +40,21 @@ func (p *staticPool) Pick(r rng.Rand) Fingerprint { return p.prints[r.IntN(len(p
 //go:embed fingerprints.json
 var fingerprintData []byte
 
-// DefaultFingerprintPool decodes and validates the embedded fingerprint table.
-func DefaultFingerprintPool() (FingerprintPool, error) {
+// defaultPool parses fingerprintData exactly once per process. sync.OnceValues
+// is the idiomatic Go cache-once idiom; the error is permanent (embedded data
+// is immutable), so callers may surface it without a retry loop.
+var defaultPool = sync.OnceValues(func() (FingerprintPool, error) {
 	var prints []Fingerprint
 	if err := json.Unmarshal(fingerprintData, &prints); err != nil {
 		return nil, fmt.Errorf("behavior: decode embedded fingerprints: %w", err)
 	}
 	return NewFingerprintPool(prints)
+})
+
+// DefaultFingerprintPool returns the embedded fingerprint table, parsed and
+// validated once per process.
+func DefaultFingerprintPool() (FingerprintPool, error) {
+	return defaultPool()
 }
 
 // NewFingerprintPool validates every fingerprint and returns a defensively-copied

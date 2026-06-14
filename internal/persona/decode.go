@@ -85,6 +85,9 @@ func parseNormal(rd RawDist) (behavior.Distribution, error) {
 	if err != nil {
 		return nil, fmt.Errorf("max: %w", err)
 	}
+	if mean < 0 {
+		return nil, fmt.Errorf("mean must be >= 0")
+	}
 	if std < 0 {
 		return nil, fmt.Errorf("stddev must be >= 0")
 	}
@@ -157,6 +160,9 @@ func parseBurst(rb RawBurst) (behavior.BurstModel, error) {
 func parseCurve(rc RawCurve) (behavior.TimeOfDayShaper, error) {
 	if rc.Location == "" && len(rc.Weekday) == 0 && len(rc.Weekend) == 0 {
 		return behavior.FlatTimeOfDay{}, nil
+	}
+	if rc.Location == "" {
+		return nil, fmt.Errorf("location is required when weekday or weekend curves are provided")
 	}
 	loc, err := time.LoadLocation(rc.Location)
 	if err != nil {

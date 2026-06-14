@@ -3,6 +3,8 @@ package scenario
 import (
 	"strings"
 	"testing"
+
+	"github.com/Principe1218/phantomTraffic/internal/pterr"
 )
 
 // assertEqual fails the test unless got == want, labeling the mismatch so a
@@ -28,17 +30,17 @@ func expectEqual[T comparable](t *testing.T, label string, got, want T) {
 	}
 }
 
-// requireValidationErrors asserts err is a non-nil ValidationErrors and returns
+// requireValidationErrors asserts err is a non-nil pterr.FieldErrors and returns
 // it. It folds the two checks every "expect a config error" test repeats — the
-// non-nil guard and the ValidationErrors type assertion — into one helper.
-func requireValidationErrors(t *testing.T, err error) ValidationErrors {
+// non-nil guard and the type assertion — into one helper.
+func requireValidationErrors(t *testing.T, err error) pterr.FieldErrors {
 	t.Helper()
 	if err == nil {
-		t.Fatalf("expected a ValidationErrors, got nil")
+		t.Fatalf("expected a FieldErrors, got nil")
 	}
-	ve, ok := err.(ValidationErrors)
+	ve, ok := err.(pterr.FieldErrors)
 	if !ok {
-		t.Fatalf("error is %T, want ValidationErrors", err)
+		t.Fatalf("error is %T, want pterr.FieldErrors", err)
 	}
 	return ve
 }
@@ -46,7 +48,7 @@ func requireValidationErrors(t *testing.T, err error) ValidationErrors {
 // assertFieldError fails unless ve contains a FieldError whose Field equals field
 // and whose Msg contains msgSub. Pass msgSub == "" to match on the field path
 // alone (strings.Contains(_, "") is always true).
-func assertFieldError(t *testing.T, ve ValidationErrors, field, msgSub string) {
+func assertFieldError(t *testing.T, ve pterr.FieldErrors, field, msgSub string) {
 	t.Helper()
 	for _, fe := range ve {
 		if fe.Field == field && strings.Contains(fe.Msg, msgSub) {

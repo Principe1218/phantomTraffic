@@ -2,36 +2,19 @@ package persona
 
 import (
 	"fmt"
+	"math"
 	"strconv"
 	"strings"
 
 	"github.com/Principe1218/phantomTraffic/internal/behavior"
 	"github.com/Principe1218/phantomTraffic/internal/protocols"
+	"github.com/Principe1218/phantomTraffic/internal/pterr"
 )
 
-// FieldError is one persona-validation problem with a YAML field path.
-type FieldError struct {
-	Field string
-	Msg   string
-}
-
-func (e FieldError) Error() string { return e.Field + ": " + e.Msg }
-
-// Errors aggregates every FieldError so Compile reports all problems at once.
-type Errors []FieldError
-
-func (es Errors) Error() string {
-	parts := make([]string, len(es))
-	for i, e := range es {
-		parts[i] = e.Error()
-	}
-	return strings.Join(parts, "; ")
-}
-
-type accumulator struct{ errs Errors }
+type accumulator struct{ errs pterr.FieldErrors }
 
 func (a *accumulator) add(field, msg string) {
-	a.errs = append(a.errs, FieldError{Field: field, Msg: msg})
+	a.errs = append(a.errs, pterr.FieldError{Field: field, Msg: msg})
 }
 
 func (a *accumulator) result() error {
@@ -142,8 +125,8 @@ func compileMix(acc *accumulator, rms []RawTemplate) behavior.TemplateMix {
 			acc.add(fp+".verb", "must be non-empty and match [a-z0-9-]")
 			ok = false
 		}
-		if rm.Weight <= 0 {
-			acc.add(fp+".weight", "must be > 0")
+		if math.IsNaN(rm.Weight) || math.IsInf(rm.Weight, 0) || rm.Weight <= 0 {
+			acc.add(fp+".weight", "must be a finite positive number")
 			ok = false
 		}
 		tmpls = append(tmpls, behavior.Template{

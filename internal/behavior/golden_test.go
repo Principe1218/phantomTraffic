@@ -68,9 +68,11 @@ func runSession(t *testing.T, spec SessionSpec, script rng.FakeScript, n int) []
 }
 
 func TestSessionGoldenSequenceIsDeterministic(t *testing.T) {
-	// Per navigation step the session draws: mix.Pick (Float) + think (Norm) +
-	// jitter (Float) = 2 Floats + 1 Norm. 5 steps -> 10 Floats + 5 Norms; the
-	// script provides a few extra.
+	// Draw order per step: mix.Pick (Float) then, if burst is active, think (Norm)
+	// + jitter (Float). An idle step only draws mix.Pick. With 5 steps the burst
+	// trough fires at step 3 (active window ~5s, think ≈ 1.5-2s each), giving 4
+	// action steps × (Float+Norm+Float) + 1 idle step × Float = 9 Floats + 4 Norms;
+	// the script provides a few extra.
 	script := rng.FakeScript{
 		Floats: []float64{0.10, 0.55, 0.80, 0.20, 0.95, 0.33, 0.67, 0.41, 0.05, 0.72, 0.88, 0.15},
 		Norms:  []float64{0.2, -0.3, 0.7, -0.1, 0.4, 0.9},

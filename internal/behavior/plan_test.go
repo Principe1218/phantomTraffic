@@ -1,6 +1,7 @@
 package behavior
 
 import (
+	"math"
 	"testing"
 
 	"github.com/Principe1218/phantomTraffic/internal/protocols"
@@ -38,5 +39,11 @@ func TestNewTemplateMixRejectsBadWeights(t *testing.T) {
 	}
 	if _, err := NewTemplateMix([]Template{{Protocol: protocols.ProtoDNS, Verb: "query", Weight: 0}}); err == nil {
 		t.Fatal("expected error for zero weight")
+	}
+	if _, err := NewTemplateMix([]Template{{Protocol: protocols.ProtoDNS, Verb: "query", Weight: math.NaN()}}); err == nil {
+		t.Fatal("expected error for NaN weight")
+	}
+	if _, err := NewTemplateMix([]Template{{Protocol: protocols.ProtoDNS, Verb: "query", Weight: math.Inf(1)}}); err == nil {
+		t.Fatal("expected error for +Inf weight")
 	}
 }

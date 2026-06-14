@@ -31,7 +31,7 @@ func (s *scriptBurst) Phase(time.Time, rng.Rand) BurstPhase {
 func (s *scriptBurst) Name() string { return "script" }
 
 func navCtx(base time.Duration, prior *protocols.Result, r rng.Rand) ShapeCtx {
-	return ShapeCtx{Now: baseTime, BaseThink: base, Cause: protocols.CauseNavigation, Prior: prior, Rand: r}
+	return ShapeCtx{Now: baseTime, Think: func() time.Duration { return base }, Cause: protocols.CauseNavigation, Prior: prior, Rand: r}
 }
 
 var baseTime = time.Date(2026, 1, 5, 9, 0, 0, 0, time.UTC)

@@ -1,10 +1,8 @@
-package scenario
+package pterr
 
 import (
 	"strings"
 	"testing"
-
-	"github.com/Principe1218/phantomTraffic/internal/pterr"
 )
 
 func TestFieldErrorError(t *testing.T) {
@@ -28,38 +26,35 @@ func TestFieldErrorError(t *testing.T) {
 
 func TestFieldErrorClassIsConfig(t *testing.T) {
 	fe := FieldError{Field: "name", Msg: "must be non-empty"}
-	if got := fe.Class(); got != pterr.ClassConfig {
-		t.Fatalf("FieldError.Class() = %v, want %v (ClassConfig)", got, pterr.ClassConfig)
+	if got := fe.Class(); got != ClassConfig {
+		t.Fatalf("FieldError.Class() = %v, want %v (ClassConfig)", got, ClassConfig)
 	}
 }
 
-func TestValidationErrorsError(t *testing.T) {
-	ve := ValidationErrors{
+func TestFieldErrorsError(t *testing.T) {
+	es := FieldErrors{
 		{Field: "name", Msg: "must be non-empty"},
 		{Field: "scenarios", Msg: "at least one scenario block is required"},
 		{Field: "scenarios[0].protocol", Msg: "unknown protocol \"htttp\""},
 	}
-	got := ve.Error()
+	got := es.Error()
 	for _, want := range []string{
 		"name: must be non-empty",
 		"scenarios: at least one scenario block is required",
 		"scenarios[0].protocol: unknown protocol \"htttp\"",
 	} {
 		if !strings.Contains(got, want) {
-			t.Fatalf("ValidationErrors.Error() = %q, missing %q", got, want)
+			t.Fatalf("FieldErrors.Error() = %q, missing %q", got, want)
 		}
 	}
-	// All three messages must be joined into one string (3 distinct fragments).
 	if strings.Count(got, ": ") < 3 {
-		t.Fatalf("ValidationErrors.Error() = %q, want at least 3 joined field errors", got)
+		t.Fatalf("FieldErrors.Error() = %q, want at least 3 joined field errors", got)
 	}
 }
 
-func TestValidationErrorsImplementsError(t *testing.T) {
-	// Compile-time-ish assertion at runtime: a ValidationErrors must be usable
-	// as the error interface so Validate can return it directly.
-	var err error = ValidationErrors{{Field: "name", Msg: "x"}}
+func TestFieldErrorsImplementsError(t *testing.T) {
+	var err error = FieldErrors{{Field: "name", Msg: "x"}}
 	if err.Error() == "" {
-		t.Fatalf("ValidationErrors must render a non-empty error string")
+		t.Fatalf("FieldErrors must render a non-empty error string")
 	}
 }

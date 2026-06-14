@@ -2,6 +2,7 @@ package behavior
 
 import (
 	"fmt"
+	"math"
 
 	"github.com/Principe1218/phantomTraffic/internal/protocols"
 	"github.com/Principe1218/phantomTraffic/internal/rng"
@@ -42,8 +43,8 @@ func NewTemplateMix(templates []Template) (TemplateMix, error) {
 	cum := make([]float64, len(templates))
 	var total float64
 	for i, t := range templates {
-		if t.Weight <= 0 {
-			return TemplateMix{}, fmt.Errorf("behavior: template[%d] (%s) weight must be > 0", i, t.Ref())
+		if math.IsNaN(t.Weight) || math.IsInf(t.Weight, 0) || t.Weight <= 0 {
+			return TemplateMix{}, fmt.Errorf("behavior: template[%d] (%s) weight must be a finite positive number", i, t.Ref())
 		}
 		total += t.Weight
 		cum[i] = total

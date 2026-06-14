@@ -1,3 +1,9 @@
+// Package scenario loads and validates a PhantomTraffic scenario file into an
+// immutable, FROZEN Scenario. Validation is a PURE function (no network, no
+// filesystem beyond the caller-supplied path at Load time, no runtime limiter,
+// no audit writes). Every validation failure classifies as pterr.ClassConfig
+// and is aggregated so a single Validate pass reports ALL problems at once
+// (design §5.2, AGENTS.md §5.5: fail fast, fully, at config time).
 package scenario
 
 import (
