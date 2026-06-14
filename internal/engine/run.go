@@ -135,12 +135,45 @@ func (r *Run) startBlock(block scenario.Block) {
 		r.runRampGovernor(block, sem)
 	}()
 
-	// Completion timer fires when the block's active duration elapses.
-	r.clk.AfterFunc(block.Duration, func() {
-		if r.blocksLeft.Add(-1) == 0 {
-			r.complete()
+	// Gate-aware completion: accumulates only active (un-paused) elapsed time so
+	// operator-pause intervals do not count toward the block duration (design §6.4).
+	r.wg.Add(1)
+	go func() {
+		defer r.wg.Done()
+		r.runBlockDuration(block)
+	}()
+}
+
+// runBlockDuration accumulates active (un-paused) elapsed time toward the block's
+// Duration. Each iteration waits for the gate to be open, starts a timer for the
+// remaining duration, then selects on timer / gate-close / ctx. This implements
+// the operator-pause timer shift (design §6.4): time spent paused is not counted.
+// complete() is called in a separate goroutine to avoid deadlocking on r.wg.Wait
+// (this goroutine is itself tracked by r.wg).
+func (r *Run) runBlockDuration(block scenario.Block) {
+	var elapsed time.Duration
+	for elapsed < block.Duration {
+		closedCh, err := r.gate.waitOpenAndGetCloseCh(r.runCtx)
+		if err != nil {
+			return
 		}
-	})
+		segStart := r.clk.Now()
+		remaining := block.Duration - elapsed
+		timer := r.clk.NewTimer(remaining)
+		select {
+		case <-r.runCtx.Done():
+			timer.Stop()
+			return
+		case <-closedCh:
+			timer.Stop()
+			elapsed += r.clk.Since(segStart)
+		case <-timer.C():
+			elapsed = block.Duration
+		}
+	}
+	if r.blocksLeft.Add(-1) == 0 {
+		go r.complete()
+	}
 }
 
 // complete drives the clean-completion path.

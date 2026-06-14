@@ -28,32 +28,47 @@ type gate struct {
 	cond   *sync.Cond
 	paused [numGateSources]bool
 
+	// closeNotify is closed when the gate transitions open→closed and is replaced
+	// by a fresh channel on the next fully-open transition. runBlockDuration
+	// selects on it to implement gate-aware block-duration timer shift (design §6.4).
+	closeNotify chan struct{}
+
 	// operator-pause accounting for the ramp/schedule/duration timer shift.
 	opPausedAt    time.Time     // zero unless gateOperator is currently paused
 	opPausedTotal time.Duration // accumulated wall time spent operator-paused
 }
 
 func newGate(clk clock.Clock) *gate {
-	g := &gate{clk: clk}
+	g := &gate{
+		clk:         clk,
+		closeNotify: make(chan struct{}),
+	}
 	g.cond = sync.NewCond(&g.mu)
 	return g
 }
 
 // pause closes src. Repeated pauses of the same source are idempotent.
+// If this call transitions the gate from fully open to closed, the closeNotify
+// channel is closed so runBlockDuration can stop its active-time segment.
 func (g *gate) pause(src gateSource) {
 	g.mu.Lock()
 	defer g.mu.Unlock()
 	if g.paused[src] {
 		return
 	}
+	wasOpen := g.openLocked()
 	g.paused[src] = true
 	if src == gateOperator {
 		g.opPausedAt = g.clk.Now()
 	}
+	if wasOpen && !g.openLocked() {
+		close(g.closeNotify)
+	}
 }
 
 // resume reopens src. Resuming an already-open source is a no-op. The last
-// source to reopen wakes any goroutines blocked in wait.
+// source to reopen wakes any goroutines blocked in wait and replaces closeNotify
+// with a fresh channel so the next active segment can be monitored.
 func (g *gate) resume(src gateSource) {
 	g.mu.Lock()
 	defer g.mu.Unlock()
@@ -64,6 +79,9 @@ func (g *gate) resume(src gateSource) {
 	if src == gateOperator && !g.opPausedAt.IsZero() {
 		g.opPausedTotal += g.clk.Since(g.opPausedAt)
 		g.opPausedAt = time.Time{}
+	}
+	if g.openLocked() {
+		g.closeNotify = make(chan struct{})
 	}
 	g.cond.Broadcast()
 }
@@ -127,4 +145,35 @@ func (g *gate) pausedTotal() time.Duration {
 		total += g.clk.Since(g.opPausedAt)
 	}
 	return total
+}
+
+// waitOpenAndGetCloseCh blocks until every gate source is open, then returns
+// the current closeNotify channel while still holding g.mu. The returned channel
+// is closed when the gate next transitions open→closed and replaced by a fresh
+// channel on the following open transition. runBlockDuration uses this to sleep
+// until the gate closes WITHOUT polling (design §6.4).
+func (g *gate) waitOpenAndGetCloseCh(ctx context.Context) (<-chan struct{}, error) {
+	g.mu.Lock()
+	defer g.mu.Unlock()
+
+	stop := make(chan struct{})
+	defer close(stop)
+	go func() {
+		select {
+		case <-ctx.Done():
+			g.cond.Broadcast()
+		case <-stop:
+		}
+	}()
+
+	for !g.openLocked() {
+		if err := ctx.Err(); err != nil {
+			return nil, err
+		}
+		g.cond.Wait()
+	}
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
+	return g.closeNotify, nil
 }

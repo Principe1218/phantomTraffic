@@ -63,7 +63,7 @@ func (h NoopHandler) Do(ctx context.Context, s *protocols.Session, a protocols.A
 
 	res := protocols.Result{
 		Protocol:  protocols.ProtoHTTP,
-		Action:    a.Kind(),
+		Action:    noopActionKind,
 		Session:   s.ID,
 		Outcome:   outcome,
 		StartedAt: s.Deps.Clock.Now(),
