@@ -1,5 +1,7 @@
 # PhantomTraffic
 
+[![Quality Gate Status](https://sonarcloud.io/api/project_badges/measure?project=Principe1218_phantomTraffic&metric=alert_status)](https://sonarcloud.io/summary/new_code?id=Principe1218_phantomTraffic) [![Bugs](https://sonarcloud.io/api/project_badges/measure?project=Principe1218_phantomTraffic&metric=bugs)](https://sonarcloud.io/summary/new_code?id=Principe1218_phantomTraffic)
+
 **Realistic network traffic generator for firewall ACL validation.**
 
 PhantomTraffic generates convincing, human-like network traffic across multiple
