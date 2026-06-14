@@ -1,0 +1,11 @@
+name: bad-ramp-key
+scenarios:
+  - id: web
+    protocol: http
+    targets:
+      - web.company.com:443
+    concurrency: 1
+    duration_minutes: 5
+    ramp:
+      up_seconds: 10
+      not_a_real_ramp_key: 3
