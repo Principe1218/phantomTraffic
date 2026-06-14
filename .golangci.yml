@@ -41,8 +41,10 @@ linters:
           msg: 'use the injected rng.Rand, not a package-global rand function, inside internal/behavior'
   exclusions:
     rules:
-      # forbidigo applies ONLY inside internal/behavior: exclude it everywhere else.
+      # forbidigo applies ONLY inside internal/behavior and internal/persona (both
+      # are inside the determinism boundary and must never call time.Now/time.Sleep
+      # or a package-global rand): exclude it everywhere else.
       # Go regexp has no negative lookahead, so path-except (positive match) is used.
-      - path-except: '(^|/)internal/behavior/'
+      - path-except: '(^|/)internal/(behavior|persona)/'
         linters:
           - forbidigo

@@ -1,0 +1,19 @@
+name: office-worker
+think_time: { kind: lognormal, mu: 1.0, sigma: 0.6, scale: 1s }
+jitter: { kind: proportional, fraction: 0.1 }
+burst:
+  active: { kind: exponential, mean: 120s }
+  idle: { kind: lognormal, mu: 2.0, sigma: 0.5, scale: 1s }
+time_of_day:
+  location: "America/New_York"
+  weekday: [0.02, 0.01, 0.01, 0.01, 0.02, 0.05, 0.15, 0.40, 0.80, 0.95, 1.00, 0.95, 0.70, 0.90, 1.00, 0.95, 0.85, 0.60, 0.35, 0.20, 0.12, 0.08, 0.05, 0.03]
+  weekend: [0.02, 0.01, 0.01, 0.01, 0.01, 0.02, 0.05, 0.10, 0.20, 0.35, 0.45, 0.50, 0.50, 0.50, 0.45, 0.40, 0.35, 0.30, 0.25, 0.20, 0.15, 0.10, 0.06, 0.03]
+session:
+  length: { kind: normal, mean: 30m, stddev: 10m, min: 5m, max: 2h }
+  inter_task: { kind: lognormal, mu: 1.5, sigma: 0.7, scale: 1s }
+  abandon: 0.03
+mix:
+  - { protocol: http, verb: fetch-page, cause: navigation, pacing: shaper-managed, weight: 6 }
+  - { protocol: dns, verb: resolve-name, cause: navigation, pacing: shaper-managed, weight: 3 }
+  - { protocol: http, verb: submit-form, cause: navigation, pacing: shaper-managed, weight: 1 }
+fingerprints: default

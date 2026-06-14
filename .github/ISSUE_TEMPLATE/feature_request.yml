@@ -1,5 +1,6 @@
-name: Feature request
+name: Feature request template
 description: Suggest an idea or enhancement for PhantomTraffic
+title: "[Feature]: "
 labels: ["enhancement"]
 body:
   - type: markdown
@@ -28,9 +29,11 @@ body:
     validations:
       required: false
   - type: checkboxes
-    id: authorized-use
+    id: preflight
     attributes:
-      label: Authorized-use confirmation
+      label: Before you submit
       options:
+        - label: I searched existing issues and did not find a duplicate.
+          required: true
         - label: This request is for legitimate, authorized network-testing use (not to enable unauthorized access or abuse).
           required: true
