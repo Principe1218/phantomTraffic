@@ -12,6 +12,10 @@ import (
 type BurstModel interface {
 	Phase(now time.Time, r rng.Rand) BurstPhase
 	Name() string
+	// Clone returns a fresh copy of this model with the same configuration but
+	// independent mutable state. The engine calls Clone once per vuser session so
+	// concurrent Phase calls from different goroutines never race.
+	Clone() BurstModel
 }
 
 // BurstPhase is the renewal verdict for one step. Idle is true only at the
@@ -66,8 +70,15 @@ func (b *RenewalBurst) Phase(now time.Time, r rng.Rand) BurstPhase {
 
 func (b *RenewalBurst) Name() string { return "renewal" }
 
+// Clone returns a new *RenewalBurst with the same Active/Idle distributions but
+// fresh (unstarted) state so each vuser session owns independent mutable fields.
+func (b *RenewalBurst) Clone() BurstModel {
+	return &RenewalBurst{Active: b.Active, Idle: b.Idle}
+}
+
 // AlwaysActive never injects an idle trough (for personas without burstiness).
 type AlwaysActive struct{}
 
 func (AlwaysActive) Phase(time.Time, rng.Rand) BurstPhase { return BurstPhase{} }
 func (AlwaysActive) Name() string                         { return "always-active" }
+func (AlwaysActive) Clone() BurstModel                    { return AlwaysActive{} }

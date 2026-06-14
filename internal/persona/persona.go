@@ -30,7 +30,7 @@ func (p Persona) ToSpec(selector behavior.TargetSelector) behavior.SessionSpec {
 		Mix:       p.Mix,
 		ThinkTime: p.ThinkTime,
 		Jitter:    p.Jitter,
-		Burst:     p.Burst,
+		Burst:     p.Burst.Clone(), // fresh state per vuser — prevents concurrent Phase() races
 		TimeOfDay: p.TimeOfDay,
 		Prints:    p.Prints,
 		Shape:     p.Shape,

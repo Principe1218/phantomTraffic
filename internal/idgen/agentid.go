@@ -94,7 +94,7 @@ func writeAtomic(path, id string) error {
 	if err := tmp.Close(); err != nil {
 		return fmt.Errorf("idgen: close temp agent id: %w", err)
 	}
-	if err := os.Rename(tmpName, path); err != nil {
+	if err := os.Rename(tmpName, path); err != nil { // #nosec G703 -- tmpName is the os.CreateTemp result in the same dir; path is the controlled AgentID persistence location, not user-supplied input
 		return fmt.Errorf("idgen: rename agent id into place: %w", err)
 	}
 	return nil

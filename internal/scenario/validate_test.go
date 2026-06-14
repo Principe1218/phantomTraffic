@@ -84,7 +84,7 @@ func TestValidateOmittedCapsInheritCeiling(t *testing.T) {
 	raw := Raw{
 		Name: "minimal",
 		Scenarios: []RawBlock{
-			{ID: "only", Protocol: "http", Targets: []string{"host.example.com"}},
+			{ID: "only", Protocol: "http", Targets: []string{"host.example.com"}, DurationMinutes: 5},
 		},
 	}
 	sc, err := Validate(raw, Options{AgentCount: 1})
@@ -151,7 +151,7 @@ func TestValidateTargetErrors(t *testing.T) {
 			raw := Raw{
 				Name: "t",
 				Scenarios: []RawBlock{
-					{ID: "b", Protocol: "http", Targets: []string{tt.target}},
+					{ID: "b", Protocol: "http", Targets: []string{tt.target}, DurationMinutes: 5},
 				},
 			}
 			_, err := Validate(raw, Options{AgentCount: 1})
@@ -172,7 +172,7 @@ func TestValidateAcceptsIPAndBracketedIPv6Targets(t *testing.T) {
 			raw := Raw{
 				Name: "t",
 				Scenarios: []RawBlock{
-					{ID: "b", Protocol: "http", Targets: []string{addr}},
+					{ID: "b", Protocol: "http", Targets: []string{addr}, DurationMinutes: 5},
 				},
 			}
 			sc, err := Validate(raw, Options{AgentCount: 1})
@@ -192,6 +192,7 @@ func TestValidateInsecureGate(t *testing.T) {
 			ID:                  "b",
 			Protocol:            "http",
 			Targets:             []string{"host.example.com"},
+			DurationMinutes:     5,
 			AllowInsecure:       allowInsecure,
 			AllowInsecureReason: reason,
 		}
@@ -280,7 +281,7 @@ func TestValidateAgentCountHalvesCeiling(t *testing.T) {
 		Name: "agent-count",
 		Caps: RawCaps{PerTargetRPS: 6},
 		Scenarios: []RawBlock{
-			{ID: "web", Protocol: "http", Targets: []string{"host.example.com"}},
+			{ID: "web", Protocol: "http", Targets: []string{"host.example.com"}, DurationMinutes: 5},
 		},
 	}
 
@@ -302,7 +303,7 @@ func TestValidateAgentCountStoresDividedCeiling(t *testing.T) {
 		Name: "divided-ceiling",
 		Caps: RawCaps{PerTargetRPS: 4}, // 4 <= 5 (halved) -> valid
 		Scenarios: []RawBlock{
-			{ID: "web", Protocol: "http", Targets: []string{"host.example.com"}},
+			{ID: "web", Protocol: "http", Targets: []string{"host.example.com"}, DurationMinutes: 5},
 		},
 	}
 	sc, err := Validate(raw, Options{AgentCount: 2})

@@ -27,6 +27,8 @@ func dispatch(args []string, stdout, stderr io.Writer) int {
 		return 0
 	case "validate":
 		return runValidate(args[1:], stdout, stderr)
+	case "run":
+		return runRun(args[1:], stdout, stderr)
 	default:
 		// Unknown subcommand is an operator/usage error: usage to stderr, code 2.
 		_, _ = io.WriteString(stderr, "phantom: unknown subcommand "+strconv.Quote(args[0])+"\n") // #nosec G705 -- stderr is a CLI stream, not an HTML sink; XSS is inapplicable (arg also control-char-escaped via strconv.Quote)
@@ -41,9 +43,10 @@ func usage(w io.Writer) {
 
 Commands:
   validate <file> [flags]   Statically validate a scenario file.
+  run <file> [flags]        Load, validate, and execute a phantom-traffic run.
   help                      Show this help.
 
-Run "phantom validate -h" for validate flags.
+Run "phantom <command> -h" for per-command flags.
 `
 	_, _ = io.WriteString(w, text)
 }

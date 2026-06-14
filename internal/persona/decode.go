@@ -174,16 +174,19 @@ func parseCurve(rc RawCurve) (behavior.TimeOfDayShaper, error) {
 	if len(rc.Weekend) != 24 {
 		return nil, fmt.Errorf("weekend must have 24 entries, got %d", len(rc.Weekend))
 	}
-	var wd, we [24]float64
-	for i := 0; i < 24; i++ {
-		if rc.Weekday[i] < 0 || rc.Weekday[i] > 1 {
+	for i, v := range rc.Weekday {
+		if v < 0 || v > 1 {
 			return nil, fmt.Errorf("weekday[%d] must be in [0,1]", i)
 		}
-		if rc.Weekend[i] < 0 || rc.Weekend[i] > 1 {
+	}
+	for i, v := range rc.Weekend {
+		if v < 0 || v > 1 {
 			return nil, fmt.Errorf("weekend[%d] must be in [0,1]", i)
 		}
-		wd[i], we[i] = rc.Weekday[i], rc.Weekend[i]
 	}
+	var wd, we [24]float64
+	copy(wd[:], rc.Weekday)
+	copy(we[:], rc.Weekend)
 	return behavior.PiecewiseCurve{Loc: loc, Weekday: wd, Weekend: we}, nil
 }
 

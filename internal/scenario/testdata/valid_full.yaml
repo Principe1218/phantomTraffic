@@ -22,17 +22,21 @@ scenarios:
       - "api.company.com:8443"
     target_rotation: "sequential"
     target_rotation_interval_seconds: 300
+    duration_minutes: 30
   - id: "resolve"
     protocol: "dns"
     targets:
       - "ns1.company.com:53"
     target_rotation: "random"
     target_rotation_interval_seconds: 0
+    duration_minutes: 30
   - id: "shell"
     protocol: "ssh"
     targets:
       - "bastion.company.com:22"
+    duration_minutes: 30
   - id: "video"
     protocol: "stream"
     targets:
       - "media.company.com"
+    duration_minutes: 30

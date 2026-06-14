@@ -10,7 +10,7 @@ func TestValidateRejectsMalformedAllowedDomain(t *testing.T) {
 		Name:           "t",
 		AllowedDomains: []string{"ok.example.com", "bad host!@#"},
 		Scenarios: []RawBlock{
-			{ID: "b", Protocol: "http", Targets: []string{"host.example.com"}},
+			{ID: "b", Protocol: "http", Targets: []string{"host.example.com"}, DurationMinutes: 5},
 		},
 	}
 	_, err := Validate(raw, Options{AgentCount: 1})
@@ -24,7 +24,7 @@ func TestValidateAcceptsValidAllowedDomains(t *testing.T) {
 		Name:           "t",
 		AllowedDomains: []string{"cdn.example.com", "static.example.com"},
 		Scenarios: []RawBlock{
-			{ID: "b", Protocol: "http", Targets: []string{"host.example.com"}},
+			{ID: "b", Protocol: "http", Targets: []string{"host.example.com"}, DurationMinutes: 5},
 		},
 	}
 	sc, err := Validate(raw, Options{AgentCount: 1})

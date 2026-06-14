@@ -1,0 +1,19 @@
+name: office-hours
+weight_basis: concurrency
+schedule:
+  timezone: America/New_York
+  windows:
+    - days: [mon, tue, wed, thu, fri]
+      start: "08:00"
+      end: "18:00"
+scenarios:
+  - id: web-browsing
+    protocol: http
+    targets:
+      - web.company.com:443
+    concurrency: 5
+    duration_minutes: 30
+    weight: 70
+    ramp:
+      up_seconds: 60
+      start_concurrency: 1

@@ -6,11 +6,11 @@ import (
 )
 
 func mostlyOnes() [24]float64 {
-	var a [24]float64
-	for i := range a {
-		a[i] = 1
+	return [24]float64{
+		1, 1, 1, 1, 1, 1, 1, 1,
+		1, 1, 1, 1, 1, 1, 1, 1,
+		1, 1, 1, 1, 1, 1, 1, 1,
 	}
-	return a
 }
 
 func TestPiecewiseCurveInterpolatesAndSelectsDayType(t *testing.T) {
